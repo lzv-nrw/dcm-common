@@ -1,0 +1,218 @@
+openapi: 3.0.3
+info:
+  title: LZV.nrw - Orchestration-Controls-API
+  description:
+    This API document describes the endpoints for the Orchestration-Controls-API.
+  version: 0.2.0
+servers:
+  - url: 'http://localhost:8080/'
+tags:
+  - name: orchestration
+    description: orchestration-related endpoints
+paths:
+  /orchestration:
+    get:
+      tags:
+        - orchestration
+      description: returns orchestration status
+      operationId: status
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  queue:
+                    type: object
+                    description: queue-related information
+                    properties:
+                      size:
+                        type: integer
+                        description: current size of queue
+                    required:
+                      - size
+                  registry:
+                    type: object
+                    description: registry-related information
+                    properties:
+                      size:
+                        type: integer
+                        description: current size of registry
+                    required:
+                      - size
+                  orchestrator:
+                    type: object
+                    description: orchestrator-related information
+                    properties:
+                      ready:
+                        type: boolean
+                        description: whether orchestrator is ready to fetch jobs from queue
+                      idle:
+                        type: boolean
+                        description: whether orchestrator is in the idle state
+                      running:
+                        type: boolean
+                        description: whether orchestrator is currently running
+                      jobs:
+                        type: array
+                        description: list of jobs that are currently being processed
+                        items:
+                          type: string
+                          description: token value
+                    required:
+                      - ready
+                      - idle
+                      - running
+                      - jobs
+                  daemon:
+                    type: object
+                    description: daemon-related information
+                    properties:
+                      active:
+                        type: boolean
+                        description: whether daemon is active
+                      status:
+                        type: boolean
+                        description: whether daemon-service is running
+                    required:
+                      - active
+                      - status
+                required:
+                  - queue
+                  - registry
+                  - orchestrator
+    put:
+      tags:
+        - orchestration
+      description: start/reconfigure orchestration
+      operationId: start
+      parameters:
+      - name: until-idle
+        in: query
+        description:
+          whether automatically terminate on idle
+        schema: {}
+        required: false
+        allowEmptyValue: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: optional data to overwrite orchestration configuration
+              properties:
+                orchestrator:
+                  type: object
+                  description: orchestrator configuration like `interval`, `cwd` or `daemon`
+                  additionalProperties: true
+                daemon:
+                  type: object
+                  description: daemon configuration like `interval` or `daemon`
+                  additionalProperties: true
+              example:
+                orchestrator:
+                  interval: 1
+                  cwd: /tmp
+                  daemon: False
+                daemon:
+                  interval: 0.1
+      responses:
+        '200':
+          description: Success
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+        '503':
+          description: Fail
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: BUSY (already running)
+    post:
+      tags:
+        - orchestration
+      description: submit job
+      operationId: submit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: serialized JobConfig
+              additionalProperties: true
+              example:
+                original_body:
+                  param1: value1
+                request_body:
+                  param1: value1
+                  param2: default value2
+                properties:
+                  path: /build/sip
+      responses:
+        '200':
+          description: Success
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+    delete:
+      tags:
+        - orchestration
+      description: stop, kill, or abort orchestration
+      operationId: delete
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: specifics on what to do and how to do it
+              properties:
+                mode:
+                  type: string
+                  description: what to do
+                  default: stop
+                  enum:
+                    - stop
+                    - kill
+                    - abort
+                options:
+                  type: object
+                  description: how to do it (all entries are forwarded as kwarg to the respective orchestrator method)
+                  properties:
+                    token:
+                      type: string
+                      description: job token (only applicable when aborting)
+                      example: abcdef-12345-ghijkl-67890
+                    reason:
+                      type: string
+                      description: reason for killing or aborting (only applicable when killing or aborting)
+                      example: shutting down service
+                    origin:
+                      type: string
+                      description: origin for request to kill or abort (only applicable when killing or aborting)
+                      example: parent
+                    block:
+                      type: boolean
+                      description: whether to block until request is completed
+                      example: true
+                    re_queue:
+                      type: boolean
+                      description: re-queue job (only applicable when killing or aborting)
+                      example: true
+      responses:
+        '200':
+          description: Success
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK

@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dcm-service-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: app
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: app
+    spec:
+      containers:
+      - image: dcm-object-validator:latest
+        name: app
+        env:
+        - name: FS_MOUNT_POINT
+          value: /file_storage
+        - name: ORCHESTRATION_CONTROLS_API
+          value: "1"
+        - name: ORCHESTRATION_QUEUE_ADAPTER
+          value: http
+        - name: ORCHESTRATION_REGISTRY_ADAPTER
+          value: http
+        - name: ORCHESTRATION_QUEUE_SETTINGS
+          value: '{"url": "http://10.96.1.1:8080/queue"}'
+        - name: ORCHESTRATION_REGISTRY_SETTINGS
+          value: '{"url": "http://10.96.1.1:8080/registry"}'
+        resources: {}
+        imagePullPolicy: Never
+        volumeMounts:
+          - name: file-storage
+            mountPath: /file_storage
+      volumes:
+      - name: file-storage
+        hostPath:
+          path: /file_storage
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dcm-service-balancer
+spec:
+  type: LoadBalancer
+  selector:
+    app: app
+  ports:
+  - port: 8080
+  sessionAffinity: None
+  loadBalancerIP: 10.109.250.216
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dcm-queue-registry-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: queue-registry
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: queue-registry
+    spec:
+      containers:
+      - image: dcm-queue-registry:latest
+        name: queue-registry
+        env:
+        - name: QUEUE_MOUNT_POINT
+          value: /file_storage/queue
+        - name: REGISTRY_MOUNT_POINT
+          value: /file_storage/registry
+        resources: {}
+        imagePullPolicy: Never
+        volumeMounts:
+          - name: file-storage
+            mountPath: /file_storage
+      volumes:
+      - name: file-storage
+        hostPath:
+          path: /file_storage
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dcm-queue-registry-service
+spec:
+  type: ClusterIP
+  selector:
+    app: queue-registry
+  ports:
+  - port: 8080
+    targetPort: 8080
+  clusterIP: 10.96.1.1

@@ -1,0 +1,231 @@
+openapi: 3.0.3
+info:
+  title: LZV.nrw - KeyValueStore-API
+  description:
+    This API document describes the endpoints for the KeyValueStore-middleware
+    API. The service allows to operate a shared database for JSON-data.
+  version: 0.2.0
+servers:
+  - url: 'http://localhost:8080/'
+tags:
+  - name: database
+    description: database-related endpoints
+  - name: configuration
+    description: configuration-related endpoints
+  - name: docs
+    description: documentation-related endpoints
+paths:
+  /api:
+    get:
+      tags:
+        - docs
+      description: Returns this API document
+      operationId: api
+      responses:
+        '200':
+          description: Success
+          content:
+            application/yaml:
+              schema: {}
+  /config:
+    get:
+      tags:
+        - configuration
+      description: Returns service configuration details
+      operationId: config
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  database:
+                    type: object
+                    description: database-related configuration
+                    properties:
+                      backend:
+                        type: string
+                        description: identifier for database backend-type
+                        enum:
+                          - MemoryStore
+                          - JSONFileStore
+                      dir:
+                        type: string
+                        description: working dir in case of 'disk'-type backend
+                        example: file_storage/db
+                    example:
+                        backend: JSONFileStore
+                        dir: file_storage/db
+                    required:
+                      - backend
+                  cors:
+                    type: boolean
+                    description: whether CORS-requests are accepted
+                required:
+                  - database
+                  - cors
+  /db:
+    options:
+      tags:
+        - database
+      description: Returns a list of available keys
+      operationId: keys
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                description: list of keys
+                items:
+                  type: string
+                example:
+                  - key1
+                  - key2
+    get:
+      tags:
+        - database
+      description: Returns the JSON-value of a random key
+      operationId: next
+      parameters:
+      - name: pop
+        in: query
+        description: whether to remove the key from the database
+        schema: {}
+        required: false
+        allowEmptyValue: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                description: key-value pair from database
+                properties:
+                  key:
+                    type: string
+                    description: database key
+                  value:
+                    oneOf:
+                      - type: string
+                        nullable: true
+                      - type: integer
+                      - type: number
+                      - type: boolean
+                      - type: array
+                      - type: object
+        '404':
+          description: database is empty
+          content:
+            text/plain:
+              schema:
+                type: string
+                nullable: true
+    post:
+
+      tags:
+        - database
+      description: Writes the JSON-content for for a new key
+      operationId: push
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: string
+                  nullable: true
+                - type: integer
+                - type: number
+                - type: boolean
+                - type: array
+                - type: object
+      responses:
+        '200':
+          description: Success
+          content:
+            text/plain:
+              schema:
+                type: string
+                description: generated key
+  /db/{key}:
+    parameters:
+    - name: key
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      tags:
+        - database
+      description: Returns the JSON-content for the given key
+      operationId: get
+      parameters:
+      - name: pop
+        in: query
+        description: whether to remove the key from the database
+        schema: {}
+        required: false
+        allowEmptyValue: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: string
+                    nullable: true
+                  - type: integer
+                  - type: number
+                  - type: boolean
+                  - type: array
+                  - type: object
+        '404':
+          description: does not exist
+          content:
+            text/plain:
+              schema:
+                type: string
+                nullable: true
+    post:
+      tags:
+        - database
+      description: Updates the JSON-content for the given key
+      operationId: post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: string
+                  nullable: true
+                - type: integer
+                - type: number
+                - type: boolean
+                - type: array
+                - type: object
+      responses:
+        '200':
+          description: Success
+          content:
+            text/plain:
+              schema:
+                type: string
+    delete:
+      tags:
+        - database
+      description: Deletes the given key
+      operationId: delete
+      responses:
+        '200':
+          description: Success
+          content:
+            text/plain:
+              schema:
+                type: string

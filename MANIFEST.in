@@ -1,0 +1,1 @@
+include dcm_common/db/key_value_store/middleware/flask/openapi.yaml

@@ -1,0 +1,6 @@
+pytest>=8
+pytest-cov>=5
+requests>=2
+flask>=3
+data_plumber_http>=0.3.0,<1
+dcm_import_module_sdk>=5.0.0,<6

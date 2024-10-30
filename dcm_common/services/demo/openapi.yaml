@@ -1,0 +1,740 @@
+openapi: 3.0.3
+info:
+  title: DCM Demo Service - OpenAPI-Document
+  description: |-
+    This is the OpenAPI 3.0 specification for a generic DCM service used
+    for tests.
+  version: 0.1.0
+servers:
+  - url: 'http://localhost:8080/'
+externalDocs:
+  description: See repository hosted by University of Münster
+  url: https://zivgitlab.uni-muenster.de/ULB/lzvnrw/team-se/dcm-common
+tags:
+  - name: demo
+    description: job-related endpoints
+paths:
+  /ping:
+    get:
+      summary: ping
+      description: Use as connection test. Returns 'pong'.
+      operationId: ping
+      responses:
+        '200':
+          description: success
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: pong
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+  /status:
+    get:
+      summary: container status
+      description: Returns Status (readiness) of container.
+      operationId: get_status
+      responses:
+        '200':
+          description: success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+  /identify:
+    get:
+      summary: container self-description
+      description: Returns a detailed description of the container properties.
+      operationId: identify
+      responses:
+        '200':
+          description: success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SelfDescription'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+  /report:
+    get:
+      summary: get report
+      description: |-
+        Returns Report if the job associated with the given token exists.
+      operationId: get_report
+      tags:
+        - demo
+      parameters:
+        - $ref: '#/components/parameters/Token'
+      responses:
+        '200':
+          description: success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Report'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/JobData'
+                    example:
+                      data:
+                        success: false
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '404':
+          $ref: '#/components/responses/404NoTarget'
+        '503':
+          $ref: '#/components/responses/503Busy'
+  /demo:
+    post:
+      summary: submit demo job
+      description:
+        Enqueue demo-job.
+      operationId: demo
+      tags:
+        - demo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                demo:
+                  type: object
+                  properties:
+                    duration:
+                      type: number
+                      description:
+                        number of seconds this job should run for (excluding
+                        possible children)
+                      default: 1
+                      example: 1
+                    success:
+                      type: boolean
+                      description: expected result as given in JobData
+                      default: true
+                      example: false
+                    children:
+                      type: array
+                      description: |-
+                        details on whether this job should spawn child-jobs
+                        and how these should be configured
+
+                        (will use this same API)
+                      items:
+                        type: object
+                        description: child-job configuration
+                        properties:
+                          host:
+                            type: string
+                            description: host address for request
+                            example: https://www.lzv.nrw/demo
+                          timeout:
+                            type: number
+                            description:
+                              timeout duration for completion of this request
+                            default: 10
+                            example: 10
+                          body:
+                            type: object
+                            additionalProperties: true
+                            example:
+                              duration: 0
+                              success: false
+                        required:
+                          - host
+                          - body
+                callbackUrl:
+                  $ref: '#/components/schemas/CallbackUrl'
+              required:
+                - demo
+      callbacks:
+        termination:
+          $ref: '#/components/callbacks/termination'
+      responses:
+        '201':
+          $ref: '#/components/responses/201AcceptedSubmission'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '404':
+          $ref: '#/components/responses/404NoTarget'
+        '422':
+          $ref: '#/components/responses/422SemanticProblem'
+        '503':
+          $ref: '#/components/responses/503Busy'
+    delete:
+      summary: abort job
+      description:
+        Aborts the execution of a job (if already running) or removes it
+        from queue (otherwise). This operation is performed
+        synchronously.
+      operationId: abort
+      tags:
+        - demo
+      parameters:
+        - $ref: '#/components/parameters/Token'
+        - name: broadcast
+          in: query
+          description:
+            whether this request should be broadcasted
+            (only relevant in parallel deployment and only if message
+            broadcasting is configured)
+          schema:
+            type: boolean
+            default: true
+          required: false
+        - name: re-queue
+          in: query
+          description:
+            whether the associated token should be added to the queue
+            again
+          schema:
+            type: boolean
+            default: false
+          required: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                origin:
+                  type: string
+                  description: verbose origin of request
+                  example: frontend
+                reason:
+                  type: string
+                  description: verbose reason for request
+                  example: user abort
+      responses:
+        '200':
+          description: success
+          content:
+            text/plain:
+              schema:
+                type: string
+                example:
+                  "successfully aborted '37ee72d6-80ab-4dcd-a68d-f8d32766c80d'"
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '502':
+          description: bad gateway
+          content:
+            text/plain:
+              schema:
+                type: string
+                example:
+                  "notification service unavailable"
+components:
+  schemas:
+    Status:
+      title: ContainerStatus
+      description:
+        A ContainerStatus gives a summary of the container's status like
+        availability for job submissions
+      type: object
+      properties:
+        ready:
+          type: boolean
+          description: availability of container for a request
+          example: true
+      required:
+        - ready
+    ISODateTime:
+      title: ISODateTime
+      description: ISO-8601 datetime-stamp
+      type: string
+      pattern: /[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:[0-9]{2}/
+      example: "2024-01-01T00:00:00+01:00"
+    Token: # see also components/parameters/Token
+      title: Token
+      description: unique identifier
+      type: string
+      example: 37ee72d6-80ab-4dcd-a68d-f8d32766c80d
+    JobToken:
+      title: JobToken
+      description:
+        A JobToken is used to uniquely identify a specific job.
+      type: object
+      properties:
+        value:
+          $ref: '#/components/schemas/Token'
+        expires:
+          type: boolean
+          description: does the token expire
+          example: true
+        expires_at:
+          $ref: '#/components/schemas/ISODateTime'
+      required:
+        - value
+        - expires
+    LogMessage:
+      title: LogMessage
+      description: |-
+        This schema defines the format of the entries occurring in the
+        log of a Report. A LogMessage consists of
+
+        * datetime information (regarding time of message creation),
+        * an origin (who filed this message), and
+        * the actual message.
+      type: object
+      properties:
+        datetime:
+          $ref: '#/components/schemas/ISODateTime'
+        origin:
+          type: string
+          description: origin of message creation
+          example: Job Processor
+        body:
+          type: string
+          description: message body
+          example: Queued job.
+      required:
+        - datetime
+        - origin
+        - body
+    Log:
+      title: Log
+      description: |-
+        Common Log categories are: ERROR, WARNING, INFO, EVENT,
+        NETWORK, FILE_SYSTEM, STARTUP, SHUTDOWN, USER,
+        AUTHENTICATION, and SECURITY.
+      type: object
+      additionalProperties:
+        title: LogCategory
+        description: |-
+          list of LogMessage objects
+        type: array
+        items:
+          $ref: "#/components/schemas/LogMessage"
+      example:
+        EVENT:
+          - datetime: "2024-01-01T00:00:00+01:00"
+            origin: Job Processor
+            body: Queued job.
+          - datetime: "2024-01-01T00:00:02+01:00"
+            origin: Job Processor
+            body: Job exited normally.
+    JobData:
+      title: JobData
+      description: |-
+        job output data (data-property in Report schema)
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: success of the job
+          example: true
+      required:
+        - records
+    Report:
+      title: Report
+      description: |-
+        A Report contains
+
+        * information on job details (host, token),
+        * information on the progress of a job,
+        * a collection of log messages (categorized), and
+        * job output data, and
+        * reports for child processes spawned by this job.
+      type: object
+      properties:
+        host:
+          type: string
+          description: service url where this report has been generated
+          example: https://www.lzv.nrw/demo
+        token:
+          $ref: '#/components/schemas/JobToken'
+        args:
+          type: object
+          description: request body contents given during submission
+        progress:
+          $ref: '#/components/schemas/Progress'
+        log:
+          $ref: '#/components/schemas/Log'
+        children:
+          type: object
+          description: |-
+            Reports of child jobs spawned in the context of this job;
+            JSON-keys have the format '<identifier>@host' (following the
+            ReportIdentifier schema)
+
+            See SelfDescription.services for resolution of host
+            identifier and host url.
+          additionalProperties:
+            allOf:
+              - $ref: '#/components/schemas/Report'
+              - type: object
+                properties:
+                  data: # No detailed reports of child jobs desired
+                    type: object
+      required:
+        - host
+        - token
+        - args
+        - progress
+        - log
+      example:
+        host: https://www.lzv.nrw/demo
+        token:
+          value: 37ee72d6-80ab-4dcd-a68d-f8d32766c80d
+          expires: true
+          expires_at: "2024-01-01T00:00:00+01:00"
+        args:
+          from: transfer
+          to: ingest
+        progress:
+          status: completed
+          verbose: Job terminated normally.
+          numeric: 100
+        log:
+          ERROR:
+            - datetime: "2024-01-01T00:00:01+01:00"
+              origin: Demo Service
+              body: Problem occurred during running Job.
+          EVENT:
+            - datetime: "2024-01-01T00:00:00+01:00"
+              origin: Demo Service
+              body: Job accepted.
+            - datetime: "2024-01-01T00:00:02+01:00"
+              origin: Demo Service
+              body: Job terminated.
+    Progress:
+      type: object
+      properties:
+        status:
+          type: string
+          description: job status in processing pipeline
+          enum:
+            - queued
+            - running
+            - aborted
+            - completed
+        verbose:
+          type: string
+          description: verbose description of job-progress
+          example: waiting for response from service
+        numeric:
+          type: integer
+          description: numeric representation of progress in percent
+          example: 25
+      required:
+        - status
+        - verbose
+        - numeric
+      example:
+        status: completed
+        verbose: shutting down after success
+        numeric: 100
+    ReportIdentifier:
+      title: ReportIdentifier
+      description:
+        This type of identifier is used to identify a Report's child.
+      type: string
+      pattern: /[0-9a-zA-Z-_]+@[0-9a-zA-Z-_]+/
+      example: 0@native
+    CallbackUrl:
+      type: string
+      description: job-termination callback url
+      example: https://www.lzv.nrw/callback
+    Plugin:
+      title: Plugin
+      type: object
+      description: DCM-service plugin
+      properties:
+        name:
+          type: string
+          description: plugin identifier
+          example: plugin-0
+        description:
+          type: string
+          description: description of plugin features
+          example: this plugin performs ...
+      required:
+        - name
+        - description
+    DBAdapter:
+      title: DBAdapter
+      type: object
+      description:
+        A DBAdapter characterizes an adapter for a database by type and
+        initialization settings.
+      properties:
+        type:
+          type: string
+          description: which adapter-type to use
+          enum:
+            - native
+            - http
+          example: http
+        settings:
+          type: object
+          description: |-
+            JSON object used to initialize the adapter
+
+            adapter-specific set of settings (used during
+            initialization); see dcm-common.db-subpackage for details
+          additionalProperties: true
+          example:
+            url: https://www.lzv.nrw/db
+            timeout: 10
+            proxies:
+              http: https://www.lzv.nrw/proxy
+      required:
+        - type
+        - settings
+    SelfDescription:
+      type: object
+      description: information regarding the service's properties
+      properties:
+        description:
+          type: string
+          description:
+            a verbose self-description of the service functionality
+          example:
+            This service provides endpoints for ...
+        version:
+          type: object
+          description: collection of version strings
+          properties:
+            api:
+              type: string
+              description: version string of the implemented API
+              example: "0.2.0"
+            app:
+              type: string
+              description: version string of the app
+              example: "0.1.0"
+            python:
+              type: string
+              description: version of the python implementation
+              example: 3.10.12 (main, Mar 22 2024, 16:50:05) [GCC 11.4.0]
+            software:
+              type: object
+              description: deployed software versions
+            lib:
+              type: object
+              description: deployed library versions
+              additionalProperties:
+                type: string
+                description: version string
+                example: "0.1.0"
+              example:
+                dependency-a: "1.0.0"
+                dependency-b: "0.2.0.post1"
+          required:
+            - api
+            - app
+            - python
+            - software
+            - lib
+        configuration:
+          type: object
+          description: service configuration details
+          properties:
+            settings:
+              type: object
+              properties:
+                allow_cors:
+                  type: boolean
+                  description: whether CORS requests are allowed
+                  example: true
+                fs_mount_point:
+                  type: string
+                  description: mount point of shared file system
+                  example: /file_storage
+                orchestration:
+                  type: object
+                  description: orchestration-related settings
+                  properties:
+                    # FIXME: this should be added before in API-projects
+                    # processes:
+                    #   type: integer
+                    #   description: maximum number of simultaneous job processes
+                    #   example: 1
+                    at_startup:
+                      type: boolean
+                      description:
+                        whether orchestration-processing loop is run at startup
+                      example: true
+                    queue:
+                      $ref: '#/components/schemas/DBAdapter'
+                    registry:
+                      $ref: '#/components/schemas/DBAdapter'
+                    token:
+                      type: object
+                      description: orchestration token-related settings
+                      properties:
+                        expiration:
+                          type: boolean
+                          description: whether job tokens (and their
+                            associated info like report) expire
+                          example: true
+                        duration:
+                          type: integer
+                          description:
+                            time until job token expires in seconds
+                          example: 3600
+                      required:
+                        - expiration
+                        - duration
+                    debug:
+                      type: boolean
+                      description: whether to have orchestrator print
+                        debug-information
+                      example: true
+                    controls_api:
+                      type: boolean
+                      description: whether the orchestration-controls
+                        API is available
+                      example: true
+                    abort:
+                      type: object
+                      description: |-
+                        abort-related settings
+
+                        only relevant in parallel deployment
+                      properties:
+                        subscription:
+                          type: boolean
+                          description:
+                            whether a subscription to the abort-notifications
+                            is made
+                          example: true
+                        url:
+                          type: string
+                          description: url of the notification service
+                          example: https://www.lzv.nrw/abort-notifications
+                        timeout:
+                          type: object
+                          description: timeout-related settings
+                          properties:
+                            duration:
+                              type: number
+                              description: timeout duration
+                              example: 1.0
+                          required:
+                            - duration
+                        callback:
+                          type: string
+                          description: |-
+                            url for abort-callbacks
+
+                            if omitted, the subscriber's request address
+                            is used (as determined by the notification
+                            service)
+                          example: https://www.lzv.nrw/demo
+                      required:
+                        - subscription
+                    daemon_interval:
+                      type: number
+                      description:
+                        interval of orchestrator-restarts (after crash) in
+                        seconds
+                      example: 1
+                    orchestrator_interval:
+                      type: number
+                      description: time in seconds between each iteration
+                        of the orchestrator's processing loop
+                      example: 1
+                  required:
+                    - at_startup
+                    - queue
+                    - registry
+                    - token
+                    - debug
+                    - controls_api
+                    - abort
+              required:
+                - allow_cors
+                - orchestration
+            plugins:
+              type: object
+              description: mapping of available plugins
+              additionalProperties:
+                $ref: "#/components/schemas/Plugin"
+              example:
+                plugin-0:
+                  name: plugin-0
+                  description: this plugin performs ...
+            services:
+              type: object
+              description:
+                mapping of hostname and url for secondary DCM-services
+              additionalProperties:
+                title: Service
+                type: string
+                format: url
+              example:
+                service: <service-url>
+          required:
+            - settings
+            - plugins
+            - services
+      required:
+        - description
+        - version
+        - configuration
+  parameters:
+    Token: # see also components/schemas/Token
+      in: query
+      name: token
+      required: true
+      description:
+        unique identifier for jobs
+      example: 37ee72d6-80ab-4dcd-a68d-f8d32766c80d
+      schema:
+        $ref: '#/components/schemas/Token'
+  responses:
+    201AcceptedSubmission:
+      description: submission success
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/JobToken'
+    400BadRequest:
+      description: malformed request body
+      content:
+        text/plain:
+          schema:
+            type: string
+            example: "Missing required argument <X>"
+    404NoTarget:
+      description: target not found
+      content:
+        text/plain:
+          schema:
+            type: string
+            example: "Resource not found. Target does not exist."
+    422SemanticProblem:
+      description: semantic problem
+      content:
+        text/plain:
+          schema:
+            type: string
+            example: "Argument <X> has the wrong type"
+    503Busy:
+      description: container is busy
+      content:
+        text/plain:
+          schema:
+            type: string
+            example: "Service unavailable: maximum number of submissions reached."
+  callbacks:
+    termination:
+      '{$request.body#/CallbackUrl}':
+        post:
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/JobToken'
+          responses:
+            '200':
+              description: accept callback

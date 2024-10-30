@@ -1,0 +1,10 @@
+# LZV.nrw standard
+__pycache__/
+.pytest_cache/
+venv/
+*.egg-info/
+build/
+
+# Unit test / coverage reports
+.coverage
+htmlcov/

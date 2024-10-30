@@ -1,0 +1,22 @@
+{
+    "BagIt-Profile-Info": {
+        "Source-Organization": "Some source organization",
+        "External-Description": "Some description",
+        "BagIt-Profile-Identifier": "test_dcm_common/fixtures/test_profile.json",
+        "BagIt-Profile-Version": "0.0.1",
+        "Version": "0.0.1"
+    },
+    "Bag-Info": {
+        "Bagging-Date":{
+            "required":true
+         }
+    },
+    "Manifests-Required": [
+    ],
+    "Manifests-Allowed": [
+        "sha512",
+        "sha256"
+    ],
+    "Allow-Fetch.txt": false,
+    "Serialization": "optional"
+}
