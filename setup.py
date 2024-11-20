@@ -1,10 +1,14 @@
 from setuptools import setup
 
 setup(
-    version="3.15.0",
+    version="3.15.1",
     name="dcm-common",
-    description="common functions and components for the project LZV.nrw",
+    description=(
+        "common functions and components for the Digital Curation Manager"
+    ),
     author="LZV.nrw",
+    license="MIT",
+    python_requires=">=3.10",
     install_requires=[
     ],
     extras_require={

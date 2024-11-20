@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.15.1] - 2024-11-20
+
+### Changed
+
+- updated package metadata and README
+
 ## [3.15.0] - 2024-10-22
 
 ### Changed

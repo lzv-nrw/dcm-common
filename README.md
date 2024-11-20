@@ -1,31 +1,43 @@
-# LZV.nrw Common Code
-This package provides common functions and components for the project [lzv.nrw](https://lzv.nrw/).
+# Digital Curation Manager - Common Code Library
+This package provides common functions and components for the [`Digital Curation Manager`](https://github.com/lzv-nrw/digital-curation-manager)-project.
+This includes:
+* `db`: database implementations and adapter definitions,
+* `models`: data-model interface and common models,
+* `orchestration`: job orchestration-system,
+* `services`: various general and dcm-specific components for the definition of Flask-based web-applications
+* `daemon`: background-process utility,
+* `logger`: logging and related definitions, and
+* `util`: miscellaneous functions
 
-## Setup
-Install this package and its dependencies by issuing `pip install .` .
+## Install
+Using a virtual environment is recommended.
+Install this package and its dependencies form this repository by issuing `pip install .` .
+Alternatively, consider installing via the [extra-index-url](https://pip.pypa.io/en/stable/cli/pip_install/#finding-packages) `https://zivgitlab.uni-muenster.de/api/v4/projects/9020/packages/pypi/simple` with
+```
+pip install --extra-index-url https://zivgitlab.uni-muenster.de/api/v4/projects/9020/packages/pypi/simple dcm-common
+```
 
 ### Extra dependencies
 #### Services
-This package defines optional components related to flask-webservices.
-These can be installed by entering `pip install ".[services]"` instead.
+This package defines optional dependencies related to flask-webservices.
+These can be installed by entering `pip install ".[services]"`.
 
 #### Database
-Similarly, the `db`-subpackage imposes additional requirements.
+The `db`-subpackage imposes additional requirements.
 These can be installed using `pip install ".[db]"`.
 
 #### Orchestration
 The `orchestration`-extra shares its additional requirements with the `db`-extra due to its dependence on the `db`-subpackage.
 
-## Run tests
-Install test-related dependencies with `pip install -r dev-requirements.txt`.
-
-Run tests with `pytest -v -s` or `pytest -v -s --cov`.
-
-### Run tests under [coverage](https://coverage.readthedocs.io/en/7.3.0/)
-`coverage run -m pytest`\
-Use `coverage report` to report on the results.\
-Use `coverage html` to get annotated HTML listings detailing missed lines.
-
+## Tests
+Install additional dev-dependencies with
+```
+pip install -r dev-requirements.txt
+```
+Run unit-tests with
+```
+pytest -v -s
+```
 
 ## Services
 Requires extra `services`.
@@ -98,3 +110,4 @@ Furthermore, this approach can be easily extended with other databases like `Red
 * Michael Rahier
 * Steffen Richters-Finger
 * Malte Windrath
+* Roman Kudinov
