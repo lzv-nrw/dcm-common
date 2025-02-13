@@ -6,6 +6,7 @@ from typing import Optional
 from dataclasses import dataclass, field
 
 from dcm_common.models import DataModel, JSONObject, Report as BaseReport
+from dcm_common.services.plugins import PluginConfig
 
 
 @dataclass
@@ -28,6 +29,7 @@ class DemoConfig(DataModel):
 
     duration: Optional[float] = 1.0
     success: Optional[bool] = False
+    success_plugin: Optional[PluginConfig] = None
     children: Optional[list[_ChildConfig]] = None
 
     @DataModel.serialization_handler("children")

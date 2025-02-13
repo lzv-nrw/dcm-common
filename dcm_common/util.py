@@ -1,6 +1,6 @@
 """Module providing helper functions for the project LZV.nrw."""
 
-from typing import Callable, TypeAlias, Mapping, Optional
+from typing import Callable, TypeAlias, Mapping, Optional, Iterable
 import os
 from pathlib import Path
 from urllib import request
@@ -17,7 +17,7 @@ def get_profile(
     is_local_file: bool = False,
     is_remote_file: bool = False,
     encoding: str = "utf-8",
-    remote_timeout: int = 10
+    remote_timeout: int = 10,
 ) -> NestedDict:
     """
     Returns a dictionary generated from a JSON-format (remote or local)
@@ -75,7 +75,7 @@ def get_profile(
 def list_directory_content(
     path: str | Path,
     pattern: str = "*",
-    condition_function: Callable[[Path], bool] = lambda p: True
+    condition_function: Callable[[Path], bool] = lambda p: True,
 ) -> list[Path]:
     """
     Function for collecting the contents of a directory using
@@ -94,9 +94,7 @@ def list_directory_content(
                           (default lambda p: True)
     """
 
-    return [
-        x for x in make_path(path).glob(pattern) if condition_function(x)
-    ]
+    return [x for x in make_path(path).glob(pattern) if condition_function(x)]
 
 
 def make_path(path: str | Path) -> Path:
@@ -113,8 +111,7 @@ def make_path(path: str | Path) -> Path:
 
 
 def value_from_dict_path(
-    nesteddict: NestedDict,
-    path: list[str]
+    nesteddict: NestedDict, path: list[str]
 ) -> Optional[str | list[str]]:
     """
     Returns value in nested dict from path.
@@ -129,8 +126,7 @@ def value_from_dict_path(
     # iterate keys in path
     for key in path:
         # replace working dict if key available
-        if isinstance(current_dict, dict)\
-                and key in current_dict:
+        if isinstance(current_dict, dict) and key in current_dict:
             current_dict = current_dict[key]
         else:
             return None
@@ -178,15 +174,13 @@ def now(keep_micro: bool = False, utcdelta: Optional[int] = None) -> datetime:
 
     if keep_micro:
         return datetime.now(tz=timezone(timedelta(hours=_utcdelta)))
-    return datetime.now(
-        tz=timezone(timedelta(hours=_utcdelta))
-    ).replace(microsecond=0)
+    return datetime.now(tz=timezone(timedelta(hours=_utcdelta))).replace(
+        microsecond=0
+    )
 
 
 def get_output_path(
-    base_path: Path,
-    max_retries: int = 10,
-    mkdir: bool = True
+    base_path: Path, max_retries: int = 10, mkdir: bool = True
 ) -> Optional[Path]:
     """
     On success, it returns a `Path` that did not previously exist
@@ -212,3 +206,25 @@ def get_output_path(
                 output.rmdir()
             return output
     return None
+
+
+def qjoin(
+    values: Iterable[str],
+    separator: Optional[str] = None,
+    quote: Optional[str] = None,
+) -> str:
+    """
+    Joins values from `values` surrounded by `quote` using `separator`.
+
+    Keyword arguments:
+    values -- values
+    separator -- value-separator
+                 (default None; uses ,)
+    quote -- quotation-symbol
+             (default None; uses ')
+    """
+
+    _quote = "'" if quote is None else quote
+    return (", " if separator is None else separator).join(
+        map(lambda x: f"{_quote}{x}{_quote}", values)
+    )

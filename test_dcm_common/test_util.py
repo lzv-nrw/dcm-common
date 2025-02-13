@@ -297,3 +297,13 @@ def test_get_output_path_fail(temporary_directory):
             temporary_directory, max_retries=2
         )
         assert result is None
+
+
+def test_qjoin_default():
+    """Test function `qjoin` with default arguments."""
+    assert util.qjoin(["a", "b"]) == "'a', 'b'"
+
+
+def test_qjoin_non_default():
+    """Test function `qjoin` with non-default arguments."""
+    assert util.qjoin(["a", "b"], "|", "\"") == "\"a\"|\"b\""

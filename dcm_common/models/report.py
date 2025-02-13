@@ -51,20 +51,30 @@ class Progress(DataModel):
         return Status(value)
 
     def run(self) -> None:
-        "Set `status`-property to RUNNING."
+        """Set `status`-property to RUNNING."""
         self.status = Status.RUNNING
 
     def queue(self) -> None:
-        "Set `status`-property to QUEUED."
+        """Set `status`-property to QUEUED."""
         self.status = Status.QUEUED
 
     def abort(self) -> None:
-        "Set `status`-property to ABORTED."
+        """Set `status`-property to ABORTED."""
         self.status = Status.ABORTED
 
     def complete(self) -> None:
-        "Set `status`-property to COMPLETED."
+        """Set `status`-property to COMPLETED."""
         self.status = Status.COMPLETED
+
+    def create_verbose_update_callback(
+        self, prefix: Optional[str] = None
+    ) -> None:
+        """Returns callback to set `verbose`-property."""
+        if prefix is None:
+            _prefix = ""
+        else:
+            _prefix = f"{prefix}: "
+        return lambda value: setattr(self, "verbose", _prefix + value)
 
 
 @dataclass(kw_only=True)
@@ -76,9 +86,6 @@ class Report(DataModel):
      >>> @dataclass
      ... class ReportB(Report):
      ...    data: str
-     ...    @property
-     ...    def json(self) -> JSONable:
-     ...        return super().json | {"data": self.data}
 
     Keyword arguments:
     host -- service url where this report has been generated

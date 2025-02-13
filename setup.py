@@ -1,7 +1,8 @@
 from setuptools import setup
 
+
 setup(
-    version="3.15.1",
+    version="3.17.0",
     name="dcm-common",
     description=(
         "common functions and components for the Digital Curation Manager"
@@ -9,18 +10,21 @@ setup(
     author="LZV.nrw",
     license="MIT",
     python_requires=">=3.10",
-    install_requires=[
-    ],
+    install_requires=[],
     extras_require={
         "services": [
-            "flask>=3", "requests>=2", "pytest>=7",
-            "data_plumber_http>=0.3.0,<2",
+            "flask>=3",
+            "requests>=2",
+            "pytest>=7",
+            "data-plumber-http>=0.3.0,<2",
         ],
         "db": [
-            "flask>=3", "requests>=2",
+            "flask>=3",
+            "requests>=2",
         ],
         "orchestration": [
-            "flask>=3", "requests>=2",
+            "flask>=3",
+            "requests>=2",
         ],
     },
     packages=[
@@ -33,6 +37,7 @@ setup(
         "dcm_common.db.key_value_store.middleware.flask",
         "dcm_common.models",
         "dcm_common.orchestration",
+        "dcm_common.plugins",
         "dcm_common.services",
         "dcm_common.services.adapter",
         "dcm_common.services.demo",

@@ -4,6 +4,7 @@ This includes:
 * `db`: database implementations and adapter definitions,
 * `models`: data-model interface and common models,
 * `orchestration`: job orchestration-system,
+* `plugins`: an interface and optional extensions for a general plugin-system,
 * `services`: various general and dcm-specific components for the definition of Flask-based web-applications
 * `daemon`: background-process utility,
 * `logger`: logging and related definitions, and

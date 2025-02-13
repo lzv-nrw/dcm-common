@@ -41,3 +41,11 @@ def bagit_profile_test():
     Return the path to a local test bagit profile.
     """
     return BAGIT_PROFILE_TEST
+
+
+@pytest.fixture(name="fixtures")
+def _fixtures():
+    """
+    Return the path for the temporary directory.
+    """
+    return Path("test_dcm_common/fixtures")

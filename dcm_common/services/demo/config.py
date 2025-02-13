@@ -2,6 +2,7 @@
 
 from importlib.metadata import version
 
+from dcm_common.plugins.demo import DemoPlugin
 from dcm_common.services import FSConfig, OrchestratedAppConfig
 
 
@@ -9,6 +10,8 @@ class AppConfig(FSConfig, OrchestratedAppConfig):
     """
     Configuration for the 'Demo'-app.
     """
+
+    AVAILABLE_PLUGINS = {DemoPlugin.name: DemoPlugin()}
 
     def set_identity(self) -> None:
         super().set_identity()
@@ -23,3 +26,9 @@ class AppConfig(FSConfig, OrchestratedAppConfig):
         self.CONTAINER_SELF_DESCRIPTION["version"]["app"] = version(
             "dcm-common"
         )
+
+        # plugins
+        self.CONTAINER_SELF_DESCRIPTION["configuration"]["plugins"] = {
+            plugin.name: plugin.json
+            for plugin in self.AVAILABLE_PLUGINS.values()
+        }

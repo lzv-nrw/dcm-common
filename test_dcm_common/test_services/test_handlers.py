@@ -5,10 +5,13 @@ from importlib.metadata import version
 
 import pytest
 if version("data_plumber_http").startswith("1."):
-    from data_plumber_http.settings import Responses as _R
-    Responses = _R()
+    from data_plumber_http.settings import Responses
 else:  # TODO remove legacy-support
-    from data_plumber_http import Responses
+    from data_plumber_http import Responses as _R
+
+    def Responses():  # pylint: disable=invalid-name
+        "Mimic access to Responses as in v1."
+        return _R
 
 from dcm_common.services import handlers
 
@@ -17,7 +20,7 @@ from dcm_common.services import handlers
     ("json", "status"),
     [
         ({"key": "value"}, 400),
-        ({}, Responses.GOOD.status),
+        ({}, Responses().GOOD.status),
     ],
     ids=["no-args", "args"]
 )
@@ -33,8 +36,8 @@ def test_no_args_handler_known(json, status):
     ("json", "status"),
     (pytest_args := [
         ({"notoken": ""}, 400),
-        ({"token": ""}, Responses.GOOD.status),
-        ({"token": "value"}, Responses.GOOD.status),
+        ({"token": ""}, Responses().GOOD.status),
+        ({"token": "value"}, Responses().GOOD.status),
     ]),
     ids=[f"stage {i+1}" for i in range(len(pytest_args))]
 )
@@ -62,13 +65,13 @@ def test_target_path():
     (pytest_args := [
         ({"no-token": None}, 400),
         ({"token": None}, 422),
-        ({"token": "value"}, Responses.GOOD.status),
+        ({"token": "value"}, Responses().GOOD.status),
         ({"token": "value", "unknown": None}, 400),
         ({"token": "value", "broadcast": None}, 422),
-        ({"token": "value", "broadcast": "true"}, Responses.GOOD.status),
+        ({"token": "value", "broadcast": "true"}, Responses().GOOD.status),
         ({"token": "value", "re-queue": None}, 422),
-        ({"token": "value", "re-queue": "true"}, Responses.GOOD.status),
-        ({"token": "value", "broadcast": "false", "re-queue": "false"}, Responses.GOOD.status),
+        ({"token": "value", "re-queue": "true"}, Responses().GOOD.status),
+        ({"token": "value", "broadcast": "false", "re-queue": "false"}, Responses().GOOD.status),
     ]),
     ids=[f"stage {i+1}" for i in range(len(pytest_args))]
 )
@@ -83,13 +86,13 @@ def test_abort_query_handler(json, status):
 @pytest.mark.parametrize(
     ("json", "status"),
     (pytest_args := [
-        ({}, Responses.GOOD.status),
+        ({}, Responses().GOOD.status),
         ({"unknown": None}, 400),
         ({"reason": None}, 422),
-        ({"reason": ""}, Responses.GOOD.status),
+        ({"reason": ""}, Responses().GOOD.status),
         ({"origin": None}, 422),
-        ({"origin": ""}, Responses.GOOD.status),
-        ({"origin": "", "reason": ""}, Responses.GOOD.status),
+        ({"origin": ""}, Responses().GOOD.status),
+        ({"origin": "", "reason": ""}, Responses().GOOD.status),
     ]),
     ids=[f"stage {i+1}" for i in range(len(pytest_args))]
 )

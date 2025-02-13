@@ -8,12 +8,14 @@ from time import sleep
 from flask import Blueprint, jsonify
 from data_plumber_http.decorators import flask_handler, flask_args, flask_json
 from dcm_common import LoggingContext as Context
+from dcm_common.plugins.demo import DemoPlugin
 from dcm_common.orchestration import JobConfig, Job, Children
 from dcm_common import services
 
 from .config import AppConfig
-from .handlers import demo_handler
+from .handlers import get_demo_handler
 from .models import DemoConfig, Report
+
 try:
     import dcm_demo_sdk  # pylint: disable=wrong-import-order
 except ImportError as e:
@@ -26,6 +28,7 @@ except ImportError as e:
 
 class DemoAdapter(services.ServiceAdapter):
     """`ServiceAdapter` for the Demo service."""
+
     _SERVICE_NAME = "Demo"
     _SDK = dcm_demo_sdk
 
@@ -45,11 +48,10 @@ class DemoAdapter(services.ServiceAdapter):
 
 class DemoView(services.OrchestratedView):
     """View-class for demonstration."""
+
     NAME = "demo"
 
-    def __init__(
-        self, config: AppConfig, *args, **kwargs
-    ) -> None:
+    def __init__(self, config: AppConfig, *args, **kwargs) -> None:
         super().__init__(config, *args, **kwargs)
 
     def configure_bp(self, bp: Blueprint, *args, **kwargs) -> None:
@@ -59,21 +61,18 @@ class DemoView(services.OrchestratedView):
             json=flask_args,
         )
         @flask_handler(
-            handler=demo_handler,
+            handler=get_demo_handler(self.config.AVAILABLE_PLUGINS),
             json=flask_json,
         )
-        def demo(
-            demo: DemoConfig,
-            callback_url: Optional[str] = None
-        ):
+        def demo(demo: DemoConfig, callback_url: Optional[str] = None):
             """Submit job."""
             token = self.orchestrator.submit(
                 JobConfig(
                     request_body={
                         "demo": demo.json,
-                        "callback_url": callback_url
+                        "callback_url": callback_url,
                     },
-                    context=self.NAME
+                    context=self.NAME,
                 )
             )
             return jsonify(token.json), 201
@@ -83,9 +82,10 @@ class DemoView(services.OrchestratedView):
     def get_job(self, config: JobConfig) -> Job:
         return Job(
             cmd=lambda push, data, children: self.demo(
-                push, data, children, DemoConfig.from_json(
-                    config.request_body["demo"]
-                )
+                push,
+                data,
+                children,
+                DemoConfig.from_json(config.request_body["demo"]),
             ),
             hooks={
                 "startup": services.default_startup_hook,
@@ -94,13 +94,16 @@ class DemoView(services.OrchestratedView):
                 "abort": services.default_abort_hook,
                 "completion": services.termination_callback_hook_factory(
                     config.request_body.get("callback_url", None),
-                )
+                ),
             },
-            name="Demo Service"
+            name="Demo Service",
         )
 
     def demo(
-        self, push, report: Report, children: Children,
+        self,
+        push,
+        report: Report,
+        children: Children,
         demo_config: DemoConfig,
     ):
         """
@@ -120,9 +123,34 @@ class DemoView(services.OrchestratedView):
         # set progress info
         report.progress.verbose = "preparing.."
         push()
-        sleep(0.5*demo_config.duration)
+        sleep(0.5 * demo_config.duration)
 
-        success = [demo_config.success]
+        if demo_config.success_plugin is not None:
+            report.progress.verbose = (
+                f"calling plugin '{demo_config.success_plugin.plugin}' .."
+            )
+            report.log.log(
+                context=Context.INFO,
+                body=f"Running plugin '{demo_config.success_plugin.plugin}'.",
+            )
+            push()
+            plugin: DemoPlugin = self.config.AVAILABLE_PLUGINS[
+                demo_config.success_plugin.plugin
+            ]
+            context = plugin.create_context(
+                report.progress.create_verbose_update_callback(
+                    plugin.display_name
+                ),
+                push,
+            )
+            result = plugin.get(
+                context, **plugin.hydrate(demo_config.success_plugin.args)
+            )
+            report.log.merge(result.log.pick(Context.ERROR))
+            push()
+            success = [result.success]
+        else:
+            success = [demo_config.success]
         for i, child in enumerate(demo_config.children or []):
             if report.children is None:
                 report.children = {}
@@ -133,16 +161,16 @@ class DemoView(services.OrchestratedView):
             )
             report.log.log(
                 context=Context.INFO,
-                body=f"Making request to '{child.host}' (id '{child_id}')."
+                body=f"Making request to '{child.host}' (id '{child_id}').",
             )
             push()
             # initialize adapter, allocate and link child-report, make call
             report.children[child_id] = {}
             adapter = DemoAdapter(child.host, 0.01, child.timeout)
             adapter.run(
-                child.body, None, info := services.APIResult(
-                    report=report.children[child_id]
-                ),
+                child.body,
+                None,
+                info := services.APIResult(report=report.children[child_id]),
                 post_submission_hooks=(
                     # link to children
                     children.link_ex(
@@ -150,18 +178,18 @@ class DemoView(services.OrchestratedView):
                         abort_path="/demo",
                         tag=f"demo-child-{i}",
                         child_id=child_id,
-                        post_link_hook=push
+                        post_link_hook=push,
                     ),
                     # post to log
                     lambda token: (
                         report.log.log(
                             Context.INFO,
-                            body=f"Got token '{token}' from external service."
+                            body=f"Got token '{token}' from external service.",
                         ),
-                        push()
+                        push(),
                     ),
                 ),
-                update_hooks=(lambda data: push(),)
+                update_hooks=(lambda data: push(),),
             )
             children.remove(f"demo-child-{i}")
             # collect results
@@ -172,13 +200,13 @@ class DemoView(services.OrchestratedView):
                     body=(
                         f"Request to '{child.host}' returned with an error. "
                         + f"See child-report '{child_id}' for details."
-                    )
+                    ),
                 )
             push()
 
         report.progress.verbose = "evaluating.."
         push()
-        sleep(0.5*demo_config.duration)
+        sleep(0.5 * demo_config.duration)
 
         report.data.success = all(success)
         push()

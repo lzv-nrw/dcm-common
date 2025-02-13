@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.17.0] - 2025-02-13
+
+### Changed
+
+- updated `sbom.md`
+
+### Added
+
+- added function to load external plugins from file
+- added plugin system to Demo-service/API
+- added plugin system utility-definitions for `services`-subpackage
+- added function `util.qjoin`
+- added initial plugin-system
+
 ## [3.15.1] - 2024-11-20
 
 ### Changed

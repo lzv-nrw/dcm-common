@@ -4,7 +4,7 @@ info:
   description: |-
     This is the OpenAPI 3.0 specification for a generic DCM service used
     for tests.
-  version: 0.1.0
+  version: 0.2.0
 servers:
   - url: 'http://localhost:8080/'
 externalDocs:
@@ -118,6 +118,37 @@ paths:
                       description: expected result as given in JobData
                       default: true
                       example: false
+                    successPlugin:
+                      type: object
+                      description:
+                        plugin-configuration for generating result in JobData;
+                        if configured, takes precedence over 'success'
+                      properties:
+                        plugin:
+                          type: string
+                          description: |-
+                            plugin identifier
+
+                            (see contents of configuration.plugins as listed
+                            in a response to the GET-/identify endpoint;
+                            accepted plugin context: "testing")
+                        args:
+                          type: object
+                          description: |-
+                            plugin arguments
+
+                            (see contents of `configuration.plugins` as
+                            listed in a response to the GET-/identify
+                            endpoint for details on the plugin-specific
+                            call signature)
+                          additionalProperties: true
+                      required:
+                        - plugin
+                        - args
+                      example:
+                        plugin: demo-plugin
+                        args:
+                          success_rate: 50
                     children:
                       type: array
                       description: |-
@@ -143,8 +174,9 @@ paths:
                             type: object
                             additionalProperties: true
                             example:
-                              duration: 0
-                              success: false
+                              demo:
+                                duration: 0
+                                success: false
                         required:
                           - host
                           - body
@@ -442,10 +474,79 @@ components:
       type: string
       description: job-termination callback url
       example: https://www.lzv.nrw/callback
+    PluginArgSignature:
+      title: PluginArgSignature
+      type: object
+      description: plugin argument
+      properties:
+        type:
+          type: string
+          description: JSON type of the argument
+          enum:
+            - "string"
+            - "integer"
+            - "number"
+            - "boolean"
+            - "array"
+            - "object"
+          example: string
+        required:
+          type: boolean
+          description:
+            if true, this argument is required for a valid request
+          example: false
+        description:
+          type: string
+          description: description of argument's purpose
+          example: this argument sets ...
+        example:
+          description: example for argument value
+          example: 0
+        default:
+          description: |-
+            default value
+
+            only applicable in case of "required: false" and only to
+            primitive types or array
+          example: 0
+        itemType:
+          type: string
+          enum:
+            - "string"
+            - "integer"
+            - "number"
+            - "boolean"
+          description: |-
+            required in case of "type: array"; type of array elements
+
+            Note that all arguments in an array are required to have the
+            same type and cannot have default values assigned individually.
+            A default can be given for the entire array in the parent
+            PluginArgSignature. Only primitive types are allowed.
+        properties:
+          type: object
+          description: |-
+            required in case of "type: object"; mapping of child-names
+            and child-PluginArgSignature
+          additionalProperties:  # valid but not rendered in SwaggerUI
+            $ref: '#/components/schemas/PluginArgSignature'
+        additional_properties:
+          type: boolean
+          description: |-
+            only applicable in case of "type: object"; if false, only
+            explicitly listed properties are accepted
+          example: false
+      example:
+        type: integer
+        required: false
+        default: 0
+      required:
+        - type
+        - required
     Plugin:
       title: Plugin
-      type: object
       description: DCM-service plugin
+      type: object
       properties:
         name:
           type: string
@@ -454,10 +555,31 @@ components:
         description:
           type: string
           description: description of plugin features
-          example: this plugin performs ...
+          example: performs ...
+        context:
+          type: string
+          description: identifier for the plugin context
+          example: context-0
+        signature:
+          $ref: '#/components/schemas/PluginArgSignature'
+        dependencies:
+          type: object
+          description:
+            mapping of names and installed versions of plugin dependencies
+          additionalProperties:
+            type: string
+            description: version string
+            example: 1.0.0
+          example:
+            python-package: 1.0.0
+        info:
+          type: object
+          description: additional information
+          additionalProperties: true
       required:
         - name
         - description
+        - signature
     DBAdapter:
       title: DBAdapter
       type: object
@@ -661,7 +783,17 @@ components:
               example:
                 plugin-0:
                   name: plugin-0
-                  description: this plugin performs ...
+                  description: performs ...
+                  context: context-0
+                  signature:
+                    type: object
+                    required: true
+                    properties:
+                      param-0:
+                        type: integer
+                        required: false
+                        default: 0
+                    additional_properties: false
             services:
               type: object
               description:

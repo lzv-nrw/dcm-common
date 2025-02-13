@@ -33,6 +33,19 @@ def test_Progress_status_methods():
     assert p.status == Status.QUEUED
 
 
+def test_Progress_create_verbose_update_callback():
+    """
+    Test method `create_verbose_update_callback` of model `Progress`.
+    """
+
+    p = Progress()
+    assert p.verbose == ""
+    p.create_verbose_update_callback()("a")
+    assert p.verbose == "a"
+    p.create_verbose_update_callback("b")("a")
+    assert p.verbose == "b: a"
+
+
 def test_Report_constructor():
     """Test constructor default values of model `Report`."""
 

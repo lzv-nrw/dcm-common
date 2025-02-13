@@ -6,10 +6,16 @@ from importlib.metadata import version
 
 from data_plumber_http import Property, Object, String, FileSystemObject
 if version("data_plumber_http").startswith("1."):
-    from data_plumber_http.settings import Responses as _R
-    Responses = _R()
+    from data_plumber_http.settings import Responses
 else:  # TODO remove legacy-support
-    from data_plumber_http import Responses
+    from data_plumber_http import Responses as _R
+
+    def Responses():  # pylint: disable=invalid-name
+        "Mimic access to Responses as in v1."
+        return _R
+
+
+from .plugins import PluginType  # pylint: disable=unused-import, wrong-import-position
 
 
 no_args_handler = Object(
@@ -40,12 +46,12 @@ class TargetPath(FileSystemObject):
 
     def make(self, json, loc: str) -> tuple[Any, str, int]:
         response = super().make(json, loc)
-        if response[2] != Responses.GOOD.status:
+        if response[2] != Responses().GOOD.status:
             return response
         return (
             response[0].relative_to(self.__relative_to),
-            Responses.GOOD.msg,
-            Responses.GOOD.status
+            Responses().GOOD.msg,
+            Responses().GOOD.status
         )
 
 

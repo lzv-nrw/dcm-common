@@ -13,10 +13,10 @@ from dcm_common.services.notification import (
     app_factory as notify_app_factory, Topic, HTTPMethod
 )
 from dcm_common.db import MemoryStore, NativeKeyValueStoreAdapter
+from dcm_common.services.demo import app_factory
+from dcm_common.services.demo.config import AppConfig
 try:
     import dcm_demo_sdk
-    from dcm_common.services.demo import app_factory
-    from dcm_common.services.demo.config import AppConfig
     sdk_available = True
 except ImportError:
     sdk_available = False
@@ -409,3 +409,26 @@ def test_sdk_demo_abort_with_child_get_report_hook(
     assert "child-0@demo" in report["children"]
     assert report["children"]["child-0@demo"]["progress"]["status"] == "aborted"
     assert "SIGKILL" in str(report["children"]["child-0@demo"]["log"])
+
+
+@pytest.mark.skipif(not sdk_available, reason="missing dcm-demo-sdk")
+def test_sdk_demo_plugin(demo_app, demo_client, run_service):
+    """Run test for demo-app with plugin-job."""
+    run_service(app=demo_app, port=8080)
+    demo_api: dcm_demo_sdk.DemoApi = demo_client("http://localhost:8080")
+    token = demo_api.demo(
+        {
+            "demo": {
+                "duration": 0,
+                "successPlugin": {
+                    "plugin": "demo-plugin",
+                    "args": {"success": False},
+                },
+            }
+        }
+    )
+    report = wait_for_report(demo_api, token).model_dump()
+
+    assert report["progress"]["status"] == "completed"
+    assert not report["data"]["success"]
+    assert "demo-plugin" in str(report["log"])
