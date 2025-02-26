@@ -6,7 +6,6 @@ This module contains the definition for different versions of the
 from typing import Optional, Callable, Mapping
 import abc
 from threading import Thread, Event
-from time import sleep
 import sys
 
 
@@ -18,6 +17,7 @@ class Daemon(metaclass=abc.ABCMeta):
         self._daemon: Optional[Thread] = None
         self._stop = Event()
         self._service: Optional[Thread] = None
+        self._skip_sleep = Event()
 
     @property
     def active(self) -> bool:
@@ -64,7 +64,8 @@ class Daemon(metaclass=abc.ABCMeta):
                     )
                     self._stop.set()
                     break
-            sleep(interval)
+            self._skip_sleep.wait(interval)
+            self._skip_sleep.clear()
 
     def run(
         self, interval: Optional[float] = None, daemon: bool = False, block: bool = False
@@ -102,6 +103,7 @@ class Daemon(metaclass=abc.ABCMeta):
                  (default False)
         """
         self._stop.set()
+        self._skip_sleep.set()
         if block:
             while self.active:
                 pass

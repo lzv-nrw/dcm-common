@@ -1,22 +1,21 @@
 """Flask orchestration startup-extension."""
 
-from time import sleep, time
+from time import time
 import sys
-import atexit
+import signal
+from threading import Event
 
 from dcm_common.daemon import CDaemon
-from .common import startup_flask_run
+from .common import startup_flask_run, add_signal_handler
 from .notification import _connected
 
 
-time0 = time()
-
-
-def _startup(config, orchestrator):
+def _startup(config, orchestrator, abort: Event):
     """
     Attempts to start orchestrator (if required, blocks until
     notification-service is ready).
     """
+    time0 = time()
     if orchestrator.running:
         return
     first_try = True
@@ -30,7 +29,9 @@ def _startup(config, orchestrator):
             + "until notification service-subscription is ready.",
             file=sys.stderr
         )
-        sleep(config.ORCHESTRATION_ABORT_NOTIFICATIONS_STARTUP_INTERVAL)
+        abort.wait(config.ORCHESTRATION_ABORT_NOTIFICATIONS_STARTUP_INTERVAL)
+        if abort.is_set():
+            return
     orchestrator.run(
         cwd=config.FS_MOUNT_POINT,
         interval=config.ORCHESTRATION_ORCHESTRATOR_INTERVAL
@@ -52,10 +53,12 @@ def orchestration(app, config, orchestrator, name, as_process) -> CDaemon:
     daemon is executed directly, i.e., in the same process from which
     this process has been called.
     """
+    abort = Event()
     daemon = CDaemon(
         target=_startup, kwargs={
             "config": config,
             "orchestrator": orchestrator,
+            "abort": abort
         }
     )
     if config.ORCHESTRATION_AT_STARTUP:
@@ -71,12 +74,20 @@ def orchestration(app, config, orchestrator, name, as_process) -> CDaemon:
             daemon.run(config.ORCHESTRATION_DAEMON_INTERVAL)
 
     # perform clean shutdown on exit
-    atexit.register(
-        lambda block, origin, reason: (
-            daemon.stop(block=block),
-            orchestrator.kill(origin=origin, reason=reason),
-        ),
-        block=True, origin=name, reason="Parent shutdown."
-    )
+    def _exit():
+        """Stop daemon and orchestrator."""
+        abort.set()
+        if daemon.active:
+            daemon.stop(block=True)
+        if orchestrator.running:
+            orchestrator.kill(
+                origin=name,
+                reason="Parent shutdown.",
+                re_queue=True,
+                block=True,
+            )
+
+    add_signal_handler(signal.SIGINT, _exit)
+    add_signal_handler(signal.SIGTERM, _exit)
 
     return daemon

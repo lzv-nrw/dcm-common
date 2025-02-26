@@ -1,6 +1,6 @@
 """Test module for the `daemon.py`-module."""
 
-from time import sleep
+from time import time, sleep
 from threading import Thread, Event
 from unittest.mock import patch
 
@@ -121,6 +121,21 @@ def test_cdaemon_run_unrecoverable_error():
         d.run(interval, False, False)
     sleep(interval)
     assert not d.active
+
+
+def test_cdaemon_stop_quick():
+    """
+    Test method `stop` of class `CDaemon` for long interval.
+    """
+    def _service():
+        while True:
+            sleep(0.01)
+
+    d = CDaemon(target=_service, daemon=True)
+    d.run(100, False, True)
+    time0 = time()
+    d.stop(True)
+    assert time() - time0 < 10
 
 
 def test_fdaemon_minimal():

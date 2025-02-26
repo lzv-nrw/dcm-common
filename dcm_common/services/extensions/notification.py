@@ -2,13 +2,14 @@
 
 from typing import Optional
 import sys
-from time import sleep, time
-import atexit
+from time import time
+import signal
+from threading import Event
 
 import requests
 
 from dcm_common.daemon import CDaemon
-from .common import startup_flask_run
+from .common import startup_flask_run, add_signal_handler
 
 
 def _connected(client):
@@ -22,14 +23,12 @@ def _connected(client):
         return False
 
 
-time0 = time()
-
-
-def _connect(config):
+def _connect(config, abort: Event):
     """
     Attempts to connect to notification service (blocks until
     connected).
     """
+    time0 = time()
     first_try = True
     while not _connected(config.abort_notification_client):
         try:
@@ -41,7 +40,11 @@ def _connect(config):
                 + f"notification service ({type(exc_info).__name__}).",
                 file=sys.stderr
             )
-            sleep(config.ORCHESTRATION_ABORT_NOTIFICATIONS_STARTUP_INTERVAL)
+            abort.wait(
+                config.ORCHESTRATION_ABORT_NOTIFICATIONS_STARTUP_INTERVAL
+            )
+            if abort.is_set():
+                return
     if not first_try:
         print(
             f"[{int((time()-time0)*100)/100}] Successfully connected to "
@@ -66,9 +69,10 @@ def notification(app, config, as_process) -> Optional[CDaemon]:
     if not config.ORCHESTRATION_ABORT_NOTIFICATIONS:
         return None
 
+    abort = Event()
     daemon = CDaemon(
         target=_connect,
-        args=(config,)
+        args=(config, abort)
     )
     if as_process:
         # app in separate process via app.run
@@ -83,11 +87,14 @@ def notification(app, config, as_process) -> Optional[CDaemon]:
         # app native execution
         daemon.run(config.ORCHESTRATION_ABORT_NOTIFICATIONS_RECONNECT_INTERVAL)
 
-    atexit.register(
-        lambda: (
-            daemon.stop(block=True),
-            config.abort_notification_client.deregister(),
-        )
-    )
+    # perform clean shutdown on exit
+    def _exit():
+        """Stop daemon."""
+        abort.set()
+        if daemon.active:
+            daemon.stop(block=True)
+
+    add_signal_handler(signal.SIGINT, _exit)
+    add_signal_handler(signal.SIGTERM, _exit)
 
     return daemon

@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.18.0] - 2025-02-26
+
+### Added
+
+- added event-handling for `services.extensions`
+
+### Fixed
+
+- fixed delayed stop of `Daemon`-classes
+
 ## [3.17.0] - 2025-02-13
 
 ### Changed
