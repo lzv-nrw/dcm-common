@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.18.1] - 2025-04-15
+
+### Fixed
+
+- fixed `KeyError` when using the `services.notifications`-`app_factory` with a `JSONFileStore`-backend
+
 ## [3.18.0] - 2025-02-26
 
 ### Added

@@ -82,7 +82,7 @@ def _load_db_config_json(db: KeyValueStore) -> dict:
         "backend": db.__class__.__name__
     }
     if hasattr(db, "dir"):
-        config["database"]["dir"] = str(db.dir.resolve())
+        config["database"] = {"dir": str(db.dir.resolve())}
     return config
 
 
