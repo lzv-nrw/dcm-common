@@ -73,7 +73,14 @@ class PostgreSQLAdapter14(KeyValueStoreAdapter):
 
     def _build_base(self) -> list[str]:
         """Returns base of the psql-command as list."""
-        cmd = ["psql", "-w", "-q", "-1", "-v", "ON_ERROR_STOP=on"]
+        cmd = [
+            os.environ.get("POSTGRES_EXECUTABLE", "psql"),
+            "-w",
+            "-q",
+            "-1",
+            "-v",
+            "ON_ERROR_STOP=on",
+        ]
         if self._host is not None:
             cmd += ["-h", self._host]
         if self._port is not None:

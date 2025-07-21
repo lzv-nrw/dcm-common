@@ -28,11 +28,22 @@ from dcm_common.db import KeyValueStoreAdapter, PostgreSQLAdapter14
 
 def check_requirements():
     """Check test-requirements."""
+    _PSQL = os.environ.get("POSTGRES_EXECUTABLE", "psql")
+
     for cmd in (
-        ["psql", "-w", "-V"], [
-            "psql", "-w", "-U", "postgres", "-h", "localhost", "-p", "5432",
-            "-c", "SHOW server_version;"
-        ]
+        [_PSQL, "-w", "-V"],
+        [
+            _PSQL,
+            "-w",
+            "-U",
+            "postgres",
+            "-h",
+            "localhost",
+            "-p",
+            "5432",
+            "-c",
+            "SHOW server_version;",
+        ],
     ):
         try:
             result = subprocess.run(
@@ -44,7 +55,7 @@ def check_requirements():
                 env=os.environ | {"PGPASSWORD": "foo"}
             )
         except FileNotFoundError:
-            return False, "Missing PostgreSQL-client 'psql'."
+            return False, f"Missing PostgreSQL-client '{_PSQL}'."
         if result.returncode != 0:
             return False, result.stderr
     return True, ""

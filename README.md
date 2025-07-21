@@ -30,6 +30,10 @@ These can be installed using `pip install ".[db]"`.
 #### Orchestration
 The `orchestration`-extra shares its additional requirements with the `db`-extra due to its dependence on the `db`-subpackage.
 
+#### xml
+The `xml`-subpackage imposes additional requirements.
+These can be installed using `pip install ".[xml]"`.
+
 ## Tests
 Install additional dev-dependencies with
 ```
@@ -70,12 +74,26 @@ Requires extra `services`.
 In addition to the `BaseConfig`-environment settings, the `FSConfig` introduces the following
 * `FS_MOUNT_POINT` [DEFAULT "/file_storage"]: Path to the working directory (typically mount point of the shared file system)
 
+#### DBConfig - Environment/Configuration
+* `DB_ADAPTER` [DEFAULT "sqlite"]: database adapter-type; one of
+  * `sqlite`: for a SQLite3 database
+  * `postgres`: for a PostgreSQL14 database
+* `DB_ADAPTER_POOL_SIZE` [DEFAULT 1]: number of persistent connections in connection pool
+* `DB_ADAPTER_POOL_OVERFLOW` [DEFAULT 0]: whether to allow the pool to overflow during high load (dynamically allocates more connections when needed)
+* `DB_ADAPTER_CONNECTION_TIMEOUT` [DEFAULT null]: duration after which a database connection-attempt times out
+* `SQLITE_DB_FILE` [DEFAULT null]: SQLite db-file location (null corresponds to an in-memory database, only supports single connection and no overflow)
+* `POSTGRES_DB_NAME` [DEFAULT null]: PostgreSQL database name
+* `POSTGRES_DB_HOST` [DEFAULT null]: PostgreSQL database host
+* `POSTGRES_DB_PORT` [DEFAULT null]: PostgreSQL database port
+* `POSTGRES_DB_USER` [DEFAULT null]: PostgreSQL database user
+* `POSTGRES_DB_PASSWORD` [DEFAULT null]: PostgreSQL database password
+* `POSTGRES_DB_PASSFILE` [DEFAULT null]: PostgreSQL database passfile location
+
 ## Database
 The `db`-subpackage requires the extra `db` (see above).
 
-### Overview
-Currently, `db` contains only `key_value_store`-type implementations.
-This is itself organized in multiple subpackages:
+### Key-Value-Store implementation
+The implementation is organized in multiple subpackages:
 * `backend`: actual database implementations
   * `memory`: in-memory implementation without persistent data
   * `disk`: implementation that persists its data onto disk (in a working
@@ -95,13 +113,11 @@ This is itself organized in multiple subpackages:
   * `native`: native python database (be aware that concurrent requests can lead to unexpected results)
   * `http`: network-database (like the flask-middleware provided here) that implements the 'LZV.nrw - KeyValueStore-API'
 
-### Intended usage in the LZV.nrw-project
-The package is designed to seamlessly support both, local in-memory testing and actual deployment of DCM-services.
-* For a local test-setup, the adapter for a native database (initialized with an in-memory backend) is used.
-* In case of a deployment (e.g. with horizontal scaling and persistent data), the http-adapter is used in conjunction with a deployment of the middleware (internally using the `disk`-backend implementation).
+### SQL-adapter implementation
+The implementation contains the definition of a common interface and two adapters for PostgreSQL (`PostgreSQLAdapterSQL14`, based on the `psycopg3`-package) and SQLite (`SQLiteAdapter3`, based on the standard library package `sqlite3`) databases.
 
-Due to the common interface for adapters, the service implementation can be agnostic regarding the database (aside from initialization).
-Furthermore, this approach can be easily extended with other databases like `Redis` by adding a corresponding adapter class.
+Both adapters implement connection pooling and caching of basic database-schema information for methods like `get_table_names`.
+The cache-size can be controlled with `DB_ADAPTER_SCHEMA_CACHE_SIZE` (default 64).
 
 # Contributors
 * Sven Haubold

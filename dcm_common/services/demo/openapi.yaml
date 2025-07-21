@@ -510,19 +510,22 @@ components:
             primitive types or array
           example: 0
         itemType:
-          type: string
-          enum:
-            - "string"
-            - "integer"
-            - "number"
-            - "boolean"
-          description: |-
-            required in case of "type: array"; type of array elements
+          oneOf:
+            - title: PrimitiveType
+              type: string
+              enum:
+                - "string"
+                - "integer"
+                - "number"
+                - "boolean"
+              description: |-
+                required in case of "type: array"; type of array elements
 
-            Note that all arguments in an array are required to have the
-            same type and cannot have default values assigned individually.
-            A default can be given for the entire array in the parent
-            PluginArgSignature. Only primitive types are allowed.
+                Note that all arguments in an array are required to have the
+                same type and cannot have default values assigned individually.
+                A default can be given for the entire array in the parent
+                PluginArgSignature. Only primitive types are allowed.
+            - $ref: '#/components/schemas/PluginArgSignature'
         properties:
           type: object
           description: |-
@@ -772,9 +775,78 @@ components:
                     - debug
                     - controls_api
                     - abort
+                database:
+                  type: object
+                  description:
+                    database-related settings
+                  properties:
+                    adapter:
+                      type: string
+                      description: database adapter name
+                      example: postgres
+                    schemaVersion:
+                      type: string
+                      description: dcm-database schema version string
+                      example: "1.0.0"
+                    settings:
+                      type: object
+                      description: database-related settings
+                      properties:
+                        poolSize:
+                          type: number
+                          description: size of database connection-pool
+                          example: 10
+                        poolOverflow:
+                          type: boolean
+                          description:
+                            whether to allow the pool to overflow during
+                            high load (dynamically allocates more connections
+                            when needed)
+                          example: true
+                        connectionTimeout:
+                          type: number
+                          nullable: true
+                          description:
+                            duration after which a database connection-
+                            attempt times out; a value of null corresponds
+                            to no timeout
+                          example: 10.0
+                        file:
+                          type: string
+                          nullable: true
+                          description:
+                            file path for a SQLite database (relative to
+                            working directory); null corresponds to an
+                            in-memory database
+                          example: sqlite.db
+                        host:
+                          type: string
+                          description: PostgreSQL host name
+                          example: database
+                        name:
+                          type: string
+                          description: PostgreSQL database name
+                          example: dcm-database
+                        user:
+                          type: string
+                          description: PostgreSQL user name
+                          example: dcm
+                        port:
+                          type: string
+                          description: PostgreSQL port
+                          example: 5432
+                        password:
+                          type: boolean
+                          description: whether PostgreSQL password is set
+                          example: true
+                        passfile:
+                          type: string
+                          description: PostgreSQL passfile path
+                          example: pass
               required:
                 - allow_cors
                 - orchestration
+                - database
             plugins:
               type: object
               description: mapping of available plugins

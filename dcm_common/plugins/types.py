@@ -8,7 +8,6 @@ from copy import deepcopy
 from importlib.metadata import version, PackageNotFoundError
 
 from dcm_common.models import JSONable, JSONObject, DataModel
-from dcm_common.models.report import Progress
 from dcm_common import Logger
 
 
@@ -106,7 +105,7 @@ class Argument:
     example -- example value for argument (only `JSONType.PRIMITIVE` or
                `JSONType.ARRAY`)
     item_type -- (required only if type_ is `JSONType.ARRAY`) type of
-                 array elements (only `JSONType.PRIMITIVE`)
+                 array elements (`JSONType.PRIMITIVE` or `Argument`)
     properties -- (required only if type_ is `JSONType.OBJECT`)
                   dictionary with `Arguments` as values
 
@@ -123,7 +122,7 @@ class Argument:
         required: bool,
         description: Optional[str] = None,
         example: Optional[str | int | float | bool | list] = None,
-        item_type: Optional[str] = None,
+        item_type: Optional["str | Argument"] = None,
         properties: Optional[dict[str, "Argument"]] = None,
         additional_properties: bool = False,
         default: Optional[Any] = None,
@@ -144,12 +143,12 @@ class Argument:
                     "Missing type for list items ('type_' is "
                     + f"'{JSONType.ARRAY}' but no 'item_type' given)."
                 )
-            if item_type not in JSONType.PRIMITIVE:
+            if item_type not in JSONType.PRIMITIVE and default is not None:
                 raise ValueError(
-                    "Bad type for list items ('item_type' has to be one of "
-                    + f"'{JSONType.PRIMITIVE}' not '{item_type}')."
+                    f"Illegal default value for an '{JSONType.ARRAY}' with "
+                    + "non-primitive item-type."
                 )
-            self.item_type: Optional[str] = item_type
+            self.item_type: Optional[str | Argument] = item_type
         else:
             self.item_type = None
         # validate input: Argument is a dict
@@ -193,7 +192,10 @@ class Argument:
         if self.default is not None:
             json["default"] = self.default
         if self.item_type is not None:
-            json["itemType"] = self.item_type
+            if isinstance(self.item_type, Argument):
+                json["itemType"] = self.item_type.json
+            else:
+                json["itemType"] = self.item_type
         if self.properties is not None:
             json["properties"] = {}
             for name, p in self.properties.items():
@@ -218,11 +220,14 @@ class Argument:
                 return self.default
             return arg
         if self.type_ == JSONType.ARRAY:
-            # make a deep copy to prevent unexpected changes in default
-            # value
-            if arg is None:
-                return deepcopy(self.default)
-            return arg
+            if self.item_type in JSONType.PRIMITIVE:
+                # make a deep copy to prevent unexpected changes in default
+                # value
+                if arg is None:
+                    return deepcopy(self.default)
+                return arg
+            # this is an array of `Argument`s
+            return [self.item_type.hydrate(value) for value in arg]
 
         # object without explicit properties
         if self.properties is None:
@@ -264,14 +269,23 @@ class Argument:
         if self.type_ == JSONType.ARRAY:
             # mypy-hint
             assert isinstance(arg, list)
-            for i in arg:
-                if not isinstance(i, JSONType.MAP[self.item_type]):  # type: ignore[index, arg-type]
-                    return (
-                        False,
-                        "Array element has bad type, expected "
-                        + f"'{self.item_type}' but found "
-                        + f"'{JSONType.PAM.get(type(i), type(i).__name__)}'.",
-                    )
+            for index, value in enumerate(arg):
+                if self.item_type in JSONType.PRIMITIVE:
+                    if not isinstance(value, JSONType.MAP[self.item_type]):  # type: ignore[index, arg-type]
+                        return (
+                            False,
+                            "Array element has bad type, expected "
+                            + f"'{self.item_type}' but found "
+                            + f"'{JSONType.PAM.get(type(value), type(value).__name__)}'.",
+                        )
+                else:
+                    response = self.item_type.validate(value)
+                    if not response[0]:
+                        return (
+                            False,
+                            f"Bad value '{value}' in array at position "
+                            + f"{index}: {response[1]}"
+                        )
 
         # validate properties if necessary
         if self.type_ == JSONType.OBJECT:

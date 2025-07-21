@@ -9,6 +9,7 @@ import pytest
 
 from dcm_common import LoggingContext as Context
 from dcm_common.services.tests import run_service, external_service
+from dcm_common.plugins import PluginInterface, Argument, Signature, JSONType
 from dcm_common.services.notification import (
     app_factory as notify_app_factory, Topic, HTTPMethod
 )
@@ -29,7 +30,9 @@ def _testing_config(temporary_directory):
         TESTING = True
         ORCHESTRATION_DAEMON_INTERVAL = 0.001
         ORCHESTRATION_ORCHESTRATOR_INTERVAL = 0.001
-        ORCHESTRATION_ABORT_NOTIFICATIONS_STARTUP_INTERVAL = 0.01
+        ORCHESTRATION_ABORT_NOTIFICATIONS_STARTUP_INTERVAL = 0.001
+        DB_ADAPTER_STARTUP_INTERVAL = 0.001
+        DB_ADAPTER_STARTUP_IMMEDIATELY = True
     return _AppConfig
 
 
@@ -87,9 +90,84 @@ def test_sdk_identify(demo_app, default_client, run_service, testing_config):
     """Test identify-implementation for demo-app."""
     run_service(app=demo_app, port=8080)
     default_api: dcm_demo_sdk.DefaultApi = default_client("http://localhost:8080")
+
+    # apparently, the OpenAPI-Generator sdk model_dump renames fields in json
+    # so the data has to be converted to a json beforehand (which does not
+    # support "exclude_none")
+    # also optional fields with None-value are not removed..
+    def clear_null_values(json):
+        return {
+            k: (clear_null_values(v) if isinstance(v, dict) else v)
+            for k, v in json.items()
+            if v is not None
+        }
+
     assert (
-        default_api.identify().model_dump(exclude_none=True)
-        == testing_config().CONTAINER_SELF_DESCRIPTION
+        clear_null_values(default_api.identify().to_dict())
+        == clear_null_values(testing_config().CONTAINER_SELF_DESCRIPTION)
+    )
+
+
+@pytest.mark.skipif(not sdk_available, reason="missing dcm-demo-sdk")
+def test_sdk_identify_w_complex_array_plugin_arg_signature(
+    default_client, run_service, testing_config
+):
+    class PluginWithComplexArgSignature(PluginInterface):
+        _NAME = "demo-plugin"
+        _DISPLAY_NAME = "Demo Plugin"
+        _DESCRIPTION = "Some plugin description"
+        _CONTEXT = "testing"
+        _SIGNATURE = Signature(
+            array0=Argument(
+                JSONType.ARRAY,
+                False,
+                item_type=JSONType.STRING,
+            ),
+            array1=Argument(
+                JSONType.ARRAY,
+                False,
+                item_type=Argument(JSONType.STRING, False),
+            ),
+            array2=Argument(
+                JSONType.ARRAY,
+                False,
+                item_type=Argument(
+                    JSONType.ARRAY,
+                    False,
+                    item_type=Argument(
+                        JSONType.OBJECT,
+                        False,
+                        properties={"p1": Argument(JSONType.STRING, False)},
+                    ),
+                ),
+            ),
+        )
+
+        def _get(self, context, /, **kwargs):
+            return context.result
+
+    class ThisAppConfig(testing_config):
+        AVAILABLE_PLUGINS = {"demo-plugin": PluginWithComplexArgSignature()}
+
+    run_service(app=app_factory(ThisAppConfig(), as_process=True), port=8080)
+    default_api: dcm_demo_sdk.DefaultApi = default_client(
+        "http://localhost:8080"
+    )
+
+    # apparently, the OpenAPI-Generator sdk model_dump does not work with
+    # anyOf (occurs in itemType of PluginArgSignature); so the data has to
+    # be converted to a json beforehand (which does not support "exclude_none")
+    # also optional fields with None-value are not removed..
+    def clear_null_values(json):
+        return {
+            k: (clear_null_values(v) if isinstance(v, dict) else v)
+            for k, v in json.items()
+            if v is not None
+        }
+    # pylint: disable=comparison-with-callable
+    assert (
+        clear_null_values(default_api.identify().to_dict())
+        == clear_null_values(ThisAppConfig().CONTAINER_SELF_DESCRIPTION)
     )
 
 

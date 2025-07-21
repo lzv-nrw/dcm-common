@@ -1,5 +1,27 @@
 # Changelog
 
+## [3.25.0] - 2025-07-21
+
+### Changed
+
+- refactored existing extensions in `dcm_common.services.extensions` to support requirements for loading
+- added optional startup-`timeout`-argument to fixture `dcm_common.services.tests.fixtures.run_service`
+
+### Added
+
+- added `xml`-subpackage, which includes an xml-validator
+- added optional argument `request_timeout` in the `ServiceAdapter` interface
+- added `db`-extension
+- added `DBConfig` for working with SQL-databases
+- added SQL adapters to `db`-package, with support for PostgreSQL and SQLite databases
+- added support for non-primitive itemType in array-fields of `PluginArgSignature`-schema in demo-service API
+- added support for non-primitive itemType in array-fields of plugin-signatures
+
+### Fixed
+
+- fixed default serialization-behavior of `DataModel` class for dictionary-attributes (do not skip keys with leading underscore)
+- fixed `dcm_common.services.extensions.orchestration`-extension to stop when connection to notification-service is interrupted
+
 ## [3.18.1] - 2025-04-15
 
 ### Fixed

@@ -54,6 +54,9 @@ class ServiceAdapter(metaclass=abc.ABCMeta):
     timeout -- timeout duration for the completion of a service job
                in seconds
                (default 360)
+    request_timeout -- timeout duration for the submission of a request
+                       to a service in seconds
+                       (default None uses class attribute `REQUEST_TIMEOUT`)
     """
 
     @classmethod
@@ -75,11 +78,20 @@ class ServiceAdapter(metaclass=abc.ABCMeta):
     REQUEST_TIMEOUT = 1
 
     def __init__(
-        self, url: str, interval: float = 1, timeout: float = 360
+        self,
+        url: str,
+        interval: float = 1,
+        timeout: float = 360,
+        request_timeout: Optional[float] = None,
     ) -> None:
         self._url = url
         self.interval = interval
         self.timeout = timeout
+        self.request_timeout = (
+            request_timeout
+            if request_timeout is not None
+            else self.REQUEST_TIMEOUT
+        )
         self._default_api_client, self._api_client = self._get_api_clients()
         self._progress_endpoint = self._get_progress_endpoint(self._api_client)
         self._report_endpoint = self._get_report_endpoint(self._api_client)
@@ -210,7 +222,7 @@ class ServiceAdapter(metaclass=abc.ABCMeta):
         """
         try:
             response = endpoint(
-                request_body, _request_timeout=self.REQUEST_TIMEOUT
+                request_body, _request_timeout=self.request_timeout
             )
         except ReadTimeoutError as exc_info:
             self._finalize_with_error(
@@ -398,7 +410,7 @@ class ServiceAdapter(metaclass=abc.ABCMeta):
             _info = info
         try:
             response = (endpoint or self._progress_endpoint)(
-                token, _request_timeout=self.REQUEST_TIMEOUT
+                token, _request_timeout=self.request_timeout
             )
             self._update_info_report(response.to_dict(), _info)
             if endpoint is None:

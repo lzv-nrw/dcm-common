@@ -22,7 +22,7 @@ def _default_app(default_config):
     app.config.from_object(default_config)
     app.register_blueprint(
         DefaultView(
-            default_config, ScalableOrchestrator(lambda config: Job())
+            default_config, ready=lambda: True
         ).get_blueprint(),
         url_prefix="/"
     )
@@ -52,6 +52,23 @@ def test_status(default_client):
     assert isinstance(response.json["ready"], bool)
 
 
+def test_ready(default_client, default_config):
+    """Test status route."""
+    response = default_client.get("/ready")
+    assert response.status_code == 200
+    assert response.mimetype == "text/plain"
+
+    app2 = Flask(__name__)
+    app2.register_blueprint(
+        DefaultView(default_config, ready=lambda: False).get_blueprint(),
+        url_prefix="/"
+    )
+    default_client2 = app2.test_client()
+    response2 = default_client2.get("/ready")
+    assert response2.status_code == 503
+    assert response2.mimetype == "text/plain"
+
+
 def test_identify(default_client, default_config):
     """Test identify route."""
     response = default_client.get("/identify")
@@ -73,7 +90,6 @@ def test_default_unknown_query_input(default_client, endpoint):
     response = default_client.get(f"/{endpoint}?query")
     assert response.status_code == 400
     assert response.mimetype == "text/plain"
-    print(response.data.decode(encoding="utf-8"))
 
 
 @pytest.fixture(name="report_tokens")

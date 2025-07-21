@@ -15,7 +15,11 @@ from dcm_common.plugins import JSONType, Argument, PythonDependency
         {"type_": "unknown"},
         {"type_": JSONType.STRING, "default": 0},
         {"type_": JSONType.ARRAY},
-        {"type_": JSONType.ARRAY, "item_type": JSONType.OBJECT},
+        {
+            "type_": JSONType.ARRAY,
+            "item_type": Argument(JSONType.STRING, False),
+            "default": {},
+        },
         {"type_": JSONType.OBJECT},
         {"type_": JSONType.OBJECT, "properties": {}, "default": {}},
     ],
@@ -23,7 +27,7 @@ from dcm_common.plugins import JSONType, Argument, PythonDependency
         "bad_type",
         "bad_default_type",
         "missing_itemType",
-        "bad_itemType",
+        "array_illegal_default",
         "missing_properties",
         "obj_illegal_default",
     ],
@@ -52,6 +56,79 @@ def test_argument_constructor(arguments):
         (  # array_bad
             Argument(JSONType.ARRAY, False, item_type=JSONType.STRING),
             [0, 1],
+            False,
+        ),
+        (  # array_complex_ok
+            Argument(
+                JSONType.ARRAY,
+                False,
+                item_type=Argument(
+                    JSONType.OBJECT,
+                    False,
+                    properties={"p1": Argument(JSONType.STRING, False)},
+                ),
+            ),
+            [{"p1": "some string"}, {"p1": "another string"}],
+            True,
+        ),
+        (  # array_complex2_ok
+            Argument(
+                JSONType.ARRAY,
+                False,
+                item_type=Argument(
+                    JSONType.ARRAY,
+                    False,
+                    item_type=Argument(
+                        JSONType.OBJECT,
+                        False,
+                        properties={"p1": Argument(JSONType.STRING, False)},
+                    ),
+                ),
+            ),
+            [[{"p1": "some string"}, {"p1": "another string"}], []],
+            True,
+        ),
+        (  # array_complex_bad
+            Argument(
+                JSONType.ARRAY,
+                False,
+                item_type=Argument(
+                    JSONType.OBJECT,
+                    False,
+                    properties={"p1": Argument(JSONType.STRING, False)},
+                ),
+            ),
+            [{"p1": "some string"}, {"p1": 1}],
+            False,
+        ),
+        (  # array_complex_bad2
+            Argument(
+                JSONType.ARRAY,
+                False,
+                item_type=Argument(
+                    JSONType.OBJECT,
+                    False,
+                    properties={"p1": Argument(JSONType.STRING, False)},
+                ),
+            ),
+            [{"p1": "some string"}, 1],
+            False,
+        ),
+        (  # array_complex2_bad
+            Argument(
+                JSONType.ARRAY,
+                False,
+                item_type=Argument(
+                    JSONType.ARRAY,
+                    False,
+                    item_type=Argument(
+                        JSONType.OBJECT,
+                        False,
+                        properties={"p1": Argument(JSONType.STRING, False)},
+                    ),
+                ),
+            ),
+            [[1], []],
             False,
         ),
         (  # object_ok
@@ -126,6 +203,11 @@ def test_argument_constructor(arguments):
         "primitive_bad",
         "array_ok",
         "array_bad",
+        "array_complex_ok",
+        "array_complex2_ok",
+        "array_complex_bad",
+        "array_complex_bad2",
+        "array_complex2_bad",
         "object_ok",
         "object_bad",
         "missing_required",
@@ -156,6 +238,60 @@ def test_argument_validation(argument, data, expected):
                 "type": JSONType.ARRAY,
                 "required": False,
                 "itemType": JSONType.STRING,
+            },
+        ),
+        (  # array-complex
+            Argument(
+                JSONType.ARRAY,
+                False,
+                item_type=Argument(
+                    JSONType.OBJECT,
+                    False,
+                    properties={"p1": Argument(JSONType.STRING, False)},
+                ),
+            ),
+            {
+                "type": JSONType.ARRAY,
+                "required": False,
+                "itemType": {
+                    "type": JSONType.OBJECT,
+                    "required": False,
+                    "properties": {
+                        "p1": {"type": JSONType.STRING, "required": False}
+                    },
+                    "additional_properties": False,
+                },
+            },
+        ),
+        (  # array-complex2
+            Argument(
+                JSONType.ARRAY,
+                False,
+                item_type=Argument(
+                    JSONType.ARRAY,
+                    False,
+                    item_type=Argument(
+                        JSONType.OBJECT,
+                        False,
+                        properties={"p1": Argument(JSONType.STRING, False)},
+                    ),
+                ),
+            ),
+            {
+                "type": JSONType.ARRAY,
+                "required": False,
+                "itemType": {
+                    "type": JSONType.ARRAY,
+                    "required": False,
+                    "itemType": {
+                        "type": JSONType.OBJECT,
+                        "required": False,
+                        "properties": {
+                            "p1": {"type": JSONType.STRING, "required": False}
+                        },
+                        "additional_properties": False,
+                    },
+                },
             },
         ),
         (  # object
@@ -199,6 +335,8 @@ def test_argument_validation(argument, data, expected):
     ids=[
         "primitive",
         "array",
+        "array_complex",
+        "array_complex2",
         "object",
         "default_primitive",
         "default_array",
@@ -353,6 +491,45 @@ def test_argument_json(argument, json):
             ),
             {"q1": {"p2": 0}},
             {"q1": {"p1": 0, "p2": 0}},
+        ),
+        (  # complex array with defaults in nested Object properties
+            Argument(
+                JSONType.ARRAY,
+                False,
+                item_type=Argument(
+                    JSONType.OBJECT,
+                    True,
+                    properties={
+                        "q1": Argument(JSONType.INTEGER, False, default=71)
+                    },
+                ),
+            ),
+            [{}],
+            [{"q1": 71}],
+        ),
+        (  # complex array with defaults in nested Array
+            Argument(
+                JSONType.ARRAY,
+                True,
+                item_type=JSONType.INTEGER,
+                default=[1, 2],
+            ),
+            None,
+            [1, 2],
+        ),
+        (  # complex array with defaults in nested Array
+            Argument(
+                JSONType.ARRAY,
+                False,
+                item_type=Argument(
+                    JSONType.ARRAY,
+                    True,
+                    item_type=JSONType.INTEGER,
+                    default=[1, 2],
+                ),
+            ),
+            [None],
+            [[1, 2]],
         ),
     ],
 )

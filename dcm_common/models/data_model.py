@@ -197,11 +197,17 @@ class DataModel:
     @property
     def json(self) -> JSONObject:
         """Returns dictionary that can be jsonified."""
-        return self._dict_to_json(self.__dict__, True)
+        return self._dict_to_json(
+            self.__dict__, use_handlers=True, keep_underscores=False
+        )
 
     @classmethod
     def _dict_to_json(
-        cls, json: dict, use_handlers: bool = False, keep_none: bool = False
+        cls,
+        json: dict,
+        use_handlers: bool = False,
+        keep_none: bool = False,
+        keep_underscores: bool = True,
     ) -> JSONObject:
         """Convert dictionary values into JSONable."""
         _json = {}
@@ -215,7 +221,11 @@ class DataModel:
                     ] = cls._serialization_handlers[key][1](cls, value)
                 except _DataModelDeSerializationSkipSignal:
                     pass
-            elif isinstance(key, str) and key.startswith("_"):
+            elif (
+                not keep_underscores
+                and isinstance(key, str)
+                and key.startswith("_")
+            ):
                 pass
             elif (
                 isinstance(value, DataModel)

@@ -258,6 +258,18 @@ def test_json_dictionary_with_none_value():
     assert Model({"a": None}).json == {"p": {"a": None}}
 
 
+def test_json_dictionary_with_underscore_in_key():
+    """
+    Test property `json` of class `DataModel` with a dictionary
+    containing keys with leading underscore.
+    """
+    @dataclass
+    class Model(DataModel):
+        p: dict
+
+    assert Model({"_a": "a", "a": "b"}).json == {"p": {"_a": "a", "a": "b"}}
+
+
 def test_json_dictionary_with_non_string_key():
     """
     Test property `json` of class `DataModel` with a dictionary

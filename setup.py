@@ -2,7 +2,7 @@ from setuptools import setup
 
 
 setup(
-    version="3.18.1",
+    version="3.25.0",
     name="dcm-common",
     description=(
         "common functions and components for the Digital Curation Manager"
@@ -21,10 +21,14 @@ setup(
         "db": [
             "flask>=3",
             "requests>=2",
+            "psycopg[binary]>=3",
         ],
         "orchestration": [
             "flask>=3",
             "requests>=2",
+        ],
+        "xml": [
+            "xmlschema>=3.3,<4",
         ],
     },
     packages=[
@@ -35,6 +39,8 @@ setup(
         "dcm_common.db.key_value_store.backend",
         "dcm_common.db.key_value_store.middleware",
         "dcm_common.db.key_value_store.middleware.flask",
+        "dcm_common.db.sql",
+        "dcm_common.db.sql.adapter",
         "dcm_common.models",
         "dcm_common.orchestration",
         "dcm_common.plugins",

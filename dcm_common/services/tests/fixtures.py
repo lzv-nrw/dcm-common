@@ -113,28 +113,34 @@ def run_service(request, external_service) -> Callable:
     The sub-process lives only in pytest's 'function'-scope.
     """
     PROBING_PATH = "fixture-is-running"
-    ACCEPTED_STARTING_DURATION = 5  # secs
 
     def _(
         app: Optional[Flask] = None,
         from_factory: Optional[Callable[[], Flask]] = None,
         port: str = 8080,
         routes: Optional[list[tuple[str, Callable, list[str]]]] = None,
-        app_config=None
+        app_config=None,
+        timeout: float = 5,
+        probing_path: Optional[str] = None,
     ) -> Process:
+        generate_probing_path = probing_path is None
+        if generate_probing_path:
+            probing_path = PROBING_PATH
+
         def run_process():
             if from_factory:
                 _app = from_factory()
             else:
                 _app = app or external_service(routes, app_config)
 
-            @_app.route(
-                f"/{PROBING_PATH}", methods=["GET"],
-                provide_automatic_options=False
-            )
-            def fixture_is_running():
-                """Used to probe whether service has started up."""
-                return "OK", 200
+            if generate_probing_path:
+                @_app.route(
+                    f"/{PROBING_PATH}", methods=["GET"],
+                    provide_automatic_options=False
+                )
+                def fixture_is_running():
+                    """Used to probe whether service has started up."""
+                    return "OK", 200
 
             _app.run(
                 host="0.0.0.0",
@@ -153,10 +159,10 @@ def run_service(request, external_service) -> Callable:
         # wait for service to have started up
         t0 = time()
         running = False
-        while not running and time() - t0 < ACCEPTED_STARTING_DURATION:
+        while not running and time() - t0 < timeout:
             try:
                 running = urllib.request.urlopen(
-                    f"http://localhost:{port}/{PROBING_PATH}"
+                    f"http://localhost:{port}/{probing_path}"
                 ).status == 200
             except (urllib.error.URLError, ConnectionResetError):
                 sleep(0.01)

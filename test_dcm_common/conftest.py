@@ -4,6 +4,8 @@ from pathlib import Path
 from shutil import rmtree
 
 import pytest
+from dcm_common.services.tests import external_service, run_service
+
 
 TESTING_DIR = Path("test_dcm_common/tmp")
 BAGIT_PROFILE_TEST = Path("test_dcm_common/fixtures/test_profile.json")

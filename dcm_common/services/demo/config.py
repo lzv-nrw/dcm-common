@@ -3,10 +3,10 @@
 from importlib.metadata import version
 
 from dcm_common.plugins.demo import DemoPlugin
-from dcm_common.services import FSConfig, OrchestratedAppConfig
+from dcm_common.services import FSConfig, OrchestratedAppConfig, DBConfig
 
 
-class AppConfig(FSConfig, OrchestratedAppConfig):
+class AppConfig(FSConfig, OrchestratedAppConfig, DBConfig):
     """
     Configuration for the 'Demo'-app.
     """

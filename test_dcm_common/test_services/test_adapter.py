@@ -210,10 +210,10 @@ def test_run_request_timeout_initial(
     """
 
     msg = "some message"
-    adapter.REQUEST_TIMEOUT = 0.01
+    adapter.request_timeout = 0.01
 
     def _import():
-        sleep(2*adapter.REQUEST_TIMEOUT)
+        sleep(2*adapter.request_timeout)
         return msg, 400
     run_service(routes=[("/import/external", _import, ["POST"])], port=port)
 
@@ -234,10 +234,10 @@ def test_run_request_timeout_polling(
     """
 
     msg = "some message"
-    adapter.REQUEST_TIMEOUT = 0.01
+    adapter.request_timeout = 0.01
 
     def _get_report():
-        sleep(2*adapter.REQUEST_TIMEOUT)
+        sleep(2*adapter.request_timeout)
         return msg, 400
     run_service(
         routes=[

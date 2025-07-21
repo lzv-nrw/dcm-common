@@ -4,8 +4,19 @@ import sys
 
 from flask import Flask
 
+from .common import ExtensionLoaderResult
 
-def cors(app: Flask, kwargs=None) -> None:
+
+# FIXME: drop legacy support
+def cors(app: Flask, kwargs=None) -> ExtensionLoaderResult:
+    """
+    Register the `Flask-CORS` extension with the given `kwargs` if
+    possible (i.e. if the package is installed).
+    """
+    return cors_loader(app, kwargs).data
+
+
+def cors_loader(app: Flask, kwargs=None) -> ExtensionLoaderResult:
     """
     Register the `Flask-CORS` extension with the given `kwargs` if
     possible (i.e. if the package is installed).
@@ -16,7 +27,8 @@ def cors(app: Flask, kwargs=None) -> None:
         print(
             "ERROR: Missing package 'Flask-CORS' for 'ALLOW_CORS=1'. "
             + "Exiting..",
-            file=sys.stderr
+            file=sys.stderr,
         )
         sys.exit(1)
-    CORS(app, **(kwargs or {}))
+    _cors = CORS(app, **(kwargs or {}))
+    return ExtensionLoaderResult(_cors).toggle()
