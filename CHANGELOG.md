@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.25.2] - 2025-07-30
+
+### Fixed
+
+- fixed issues with sql-database schema-caching; sql-adapters now refresh cache once if a cache-miss occurs
+- fixed attempting to run non-`ROLLBACK`-command on broken connection if a multi-statement transaction fails (PostgreSQL-adapter)
+
 ## [3.25.0] - 2025-07-21
 
 ### Changed

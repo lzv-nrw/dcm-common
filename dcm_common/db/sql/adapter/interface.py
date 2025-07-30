@@ -521,19 +521,30 @@ class SQLAdapter(metaclass=abc.ABCMeta):
 
     def _validate_table_name(self, table: str) -> None:
         """Raises `ValueError` if `table` is unknown."""
-        if table not in self.get_table_names().eval():
-            raise ValueError(f"Unknown table '{table}'.")
+        for clear in [False, True]:
+            if (
+                table in self.get_table_names(clear_schema_cache=clear).eval()
+            ):
+                return
+        raise ValueError(f"Unknown table '{table}'.")
 
     def _validate_cols_names(self, table: str, cols: list[str]) -> None:
         """Raises `ValueError` if at least one in `cols` is unknown."""
-        unknown_col = next(
-            (x for x in cols if x not in self.get_column_names(table).eval()),
-            None,
+        for clear in [False, True]:
+            known_cols = self.get_column_names(
+                table, clear_schema_cache=clear
+            ).eval()
+            if (
+                (unknown_col := next(
+                    (x for x in cols if x not in known_cols),
+                    None,
+                ))
+                is None
+            ):
+                return
+        raise ValueError(
+            f"Unknown column '{unknown_col}' for table '{table}'."
         )
-        if unknown_col is not None:
-            raise ValueError(
-                f"Unknown column '{unknown_col}' for table '{table}'."
-            )
 
     def get_insert_statement(self, table: str, row: Mapping) -> _Statement:
         """

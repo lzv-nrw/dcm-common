@@ -117,3 +117,34 @@ def test_postgres_caching_primary_key(db: PostgreSQLAdapterSQL14):
     assert db.get_primary_key("test_table").data == "id"
     db.custom_cmd("SELECT", clear_schema_cache=True)
     assert db.get_primary_key("test_table").data == "id2"
+
+
+@pytest.mark.skipif(not requirements_met, reason=skip_reason)
+def test_postgres_caching_recovery(db: PostgreSQLAdapterSQL14):
+    """
+    Test caching behavior of `PostgreSQLAdapterSQL14` in case of changes
+    to the db-schema.
+    """
+
+    db.custom_cmd("DROP TABLE test_table")
+    db.custom_cmd("CREATE TABLE test_table (id text primary key, value text)")
+    assert db.get_table_names().data == ["test_table"]
+
+    # tables
+    db.custom_cmd(
+        "CREATE TABLE test_table2 (id text primary key, value text)",
+        clear_schema_cache=False,
+    )
+    assert db.get_table_names().data == ["test_table"]
+    assert db.insert("test_table2", {"id": "a", "value": "b"}).success
+    assert db.get_table_names().data == ["test_table", "test_table2"]
+
+    # columns
+    db.custom_cmd(
+        "ALTER TABLE test_table2 ADD value2 text",
+        clear_schema_cache=False,
+    )
+    assert db.get_column_names("test_table2").data == ["id", "value"]
+    assert db.insert(
+        "test_table2", {"id": "0", "value": "1", "value2": "2"}
+    ).success

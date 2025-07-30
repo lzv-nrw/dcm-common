@@ -146,6 +146,11 @@ class PostgreSQLAdapter14(PooledConnectionAdapter, SQLAdapter):
                           (default 10)
     """
 
+    # postgres performs rollback automatically on error with active
+    # transaction; also following pooling.connection.execute-calls fail
+    # since the connection is flagged as non-healthy
+    TRANSACTION_ROLLBACK = None
+
     def _CONNECTION_FACTORY(  # pylint: disable=invalid-name
         self,
     ) -> Callable[[], PostgreSQLConnection]:
