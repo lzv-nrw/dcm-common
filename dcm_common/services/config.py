@@ -330,7 +330,14 @@ class DBConfig(BaseConfig):
     DB_ADAPTER_STARTUP_INTERVAL = 1.0
 
     def __init__(self) -> None:
-        # initialize db-adapter
+        self.init_adapter()
+        super().__init__()
+
+    def init_adapter(self) -> None:
+        """
+        Initializes database-adapter `self.db` based on current
+        attributes.
+        """
         match self.DB_ADAPTER:
             case "sqlite":
                 self.db = SQLiteAdapter3(
@@ -355,8 +362,6 @@ class DBConfig(BaseConfig):
                 )
             case _:
                 raise ValueError(f"Unknown db-identifier '{self.DB_ADAPTER}'")
-
-        super().__init__()
 
     def set_identity(self) -> None:
         super().set_identity()

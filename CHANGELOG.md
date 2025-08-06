@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.25.3] - 2025-08-06
+
+### Added
+
+- added dedicated db-adapter initialization method to `DBConfig`
+
 ## [3.25.2] - 2025-07-30
 
 ### Fixed
