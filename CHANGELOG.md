@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.26.5] - 2025-08-13
+
+### Fixed
+
+- fixed db-extension not setting ready state if already ready during first call
+
 ## [3.26.4] - 2025-08-13
 
 ### Changed

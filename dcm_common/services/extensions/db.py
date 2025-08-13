@@ -31,9 +31,8 @@ def _connect(config, db: PooledConnectionAdapter, abort, result, requirements):
             abort.wait(config.DB_ADAPTER_STARTUP_INTERVAL)
             if abort.is_set():
                 return
-        else:
-            result.ready.set()
-            print_status("Successfully connected to database.")
+    result.ready.set()
+    print_status("Successfully connected to database.")
 
 
 def db_loader(
