@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.26.0] - 2025-08-13
+
+### Changed
+
+- moved `OrchestratedAppConfig`-db-loader helpers to separate module in `db`-subpackage
+
+### Fixed
+
+- fixed `psycopg`-import check printing confusing message to stderr if not available
+
 ## [3.25.3] - 2025-08-06
 
 ### Added

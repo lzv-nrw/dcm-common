@@ -6,17 +6,8 @@ from pathlib import Path
 import importlib.metadata
 import json
 
-from dcm_common.db import (
-    KeyValueStore,
-    MemoryStore,
-    JSONFileStore,
-    KeyValueStoreAdapter,
-    NativeKeyValueStoreAdapter,
-    HTTPKeyValueStoreAdapter,
-    PostgreSQLAdapter14,
-    SQLiteAdapter3,
-    PostgreSQLAdapterSQL14,
-)
+from dcm_common.db import SQLiteAdapter3, PostgreSQLAdapterSQL14
+from dcm_common.db.key_value_store import util
 
 from dcm_common.services.notification import NotificationAPIClient
 
@@ -53,7 +44,7 @@ class BaseConfig:
                 "lib": {
                     lib.name: lib.version
                     for lib in importlib.metadata.distributions()
-                }
+                },
             },
             "configuration": {
                 "settings": {
@@ -63,17 +54,6 @@ class BaseConfig:
                 "services": {},
             },
         }
-
-
-_ORCHESTRATION_ADAPTER_OPTIONS = {
-    "native": NativeKeyValueStoreAdapter,
-    "http": HTTPKeyValueStoreAdapter,
-    "postgres14": PostgreSQLAdapter14,
-}
-_ORCHESTRATION_BACKEND_OPTIONS = {
-    "memory": MemoryStore,
-    "disk": JSONFileStore,
-}
 
 
 class OrchestratedAppConfig(BaseConfig):
@@ -86,56 +66,58 @@ class OrchestratedAppConfig(BaseConfig):
         os.environ.get("ORCHESTRATION_PROCESSES") or 1
     )
     ORCHESTRATION_AT_STARTUP = (
-        (int(os.environ.get("ORCHESTRATION_AT_STARTUP") or 1)) == 1
-    )
+        int(os.environ.get("ORCHESTRATION_AT_STARTUP") or 1)
+    ) == 1
     ORCHESTRATION_TOKEN_EXPIRATION = (
-        (int(os.environ.get("ORCHESTRATION_TOKEN_EXPIRATION") or 1)) == 1
-    )
-    ORCHESTRATION_TOKEN_DURATION = (
-        int(os.environ.get("ORCHESTRATION_TOKEN_DURATION") or 3600)
+        int(os.environ.get("ORCHESTRATION_TOKEN_EXPIRATION") or 1)
+    ) == 1
+    ORCHESTRATION_TOKEN_DURATION = int(
+        os.environ.get("ORCHESTRATION_TOKEN_DURATION") or 3600
     )
     ORCHESTRATION_DEBUG = (
-        (int(os.environ.get("ORCHESTRATION_DEBUG") or 0)) == 1
-    )
+        int(os.environ.get("ORCHESTRATION_DEBUG") or 0)
+    ) == 1
     ORCHESTRATION_CONTROLS_API = (
-        (int(os.environ.get("ORCHESTRATION_CONTROLS_API") or 0)) == 1
-    )
-    ORCHESTRATION_QUEUE_ADAPTER = (
-        os.environ.get("ORCHESTRATION_QUEUE_ADAPTER")
-    )
-    ORCHESTRATION_REGISTRY_ADAPTER = (
-        os.environ.get("ORCHESTRATION_REGISTRY_ADAPTER")
+        int(os.environ.get("ORCHESTRATION_CONTROLS_API") or 0)
+    ) == 1
+    ORCHESTRATION_QUEUE_ADAPTER = os.environ.get("ORCHESTRATION_QUEUE_ADAPTER")
+    ORCHESTRATION_REGISTRY_ADAPTER = os.environ.get(
+        "ORCHESTRATION_REGISTRY_ADAPTER"
     )
     # {"backend": "disk"|"memory", "dir": ..., "url": ..., "timeout": ...,
     # "proxies": ...}
     ORCHESTRATION_QUEUE_SETTINGS = (
         json.loads(os.environ["ORCHESTRATION_QUEUE_SETTINGS"])
-        if "ORCHESTRATION_QUEUE_SETTINGS" in os.environ else None
+        if "ORCHESTRATION_QUEUE_SETTINGS" in os.environ
+        else None
     )
     ORCHESTRATION_REGISTRY_SETTINGS = (
         json.loads(os.environ["ORCHESTRATION_REGISTRY_SETTINGS"])
-        if "ORCHESTRATION_REGISTRY_SETTINGS" in os.environ else None
+        if "ORCHESTRATION_REGISTRY_SETTINGS" in os.environ
+        else None
     )
     ORCHESTRATION_DAEMON_INTERVAL = (
         float(os.environ["ORCHESTRATION_DAEMON_INTERVAL"])
-        if "ORCHESTRATION_DAEMON_INTERVAL" in os.environ else None
+        if "ORCHESTRATION_DAEMON_INTERVAL" in os.environ
+        else None
     )
     ORCHESTRATION_ORCHESTRATOR_INTERVAL = (
         float(os.environ["ORCHESTRATION_ORCHESTRATOR_INTERVAL"])
-        if "ORCHESTRATION_ORCHESTRATOR_INTERVAL" in os.environ else None
+        if "ORCHESTRATION_ORCHESTRATOR_INTERVAL" in os.environ
+        else None
     )
 
     ORCHESTRATION_ABORT_NOTIFICATIONS = (
-        (int(os.environ.get("ORCHESTRATION_ABORT_NOTIFICATIONS") or 0)) == 1
+        int(os.environ.get("ORCHESTRATION_ABORT_NOTIFICATIONS") or 0)
+    ) == 1
+    ORCHESTRATION_ABORT_NOTIFICATIONS_URL = os.environ.get(
+        "ORCHESTRATION_ABORT_NOTIFICATIONS_URL"
     )
-    ORCHESTRATION_ABORT_NOTIFICATIONS_URL = (
-        os.environ.get("ORCHESTRATION_ABORT_NOTIFICATIONS_URL")
+    ORCHESTRATION_ABORT_NOTIFICATIONS_CALLBACK = os.environ.get(
+        "ORCHESTRATION_ABORT_NOTIFICATIONS_CALLBACK"
     )
-    ORCHESTRATION_ABORT_NOTIFICATIONS_CALLBACK = (
-        os.environ.get("ORCHESTRATION_ABORT_NOTIFICATIONS_CALLBACK")
-    )
-    ORCHESTRATION_ABORT_TIMEOUT = (
-        float(os.environ.get("ORCHESTRATION_ABORT_TIMEOUT") or 1.0)
+    ORCHESTRATION_ABORT_TIMEOUT = float(
+        os.environ.get("ORCHESTRATION_ABORT_TIMEOUT") or 1.0
     )
     # FIXME: when breaking legacy support, rename to more recent scheme:
     # ORCHESTRATION_STARTUP_INTERVAL, NOTIFICATIONS_STARTUP_INTERVAL
@@ -147,25 +129,25 @@ class OrchestratedAppConfig(BaseConfig):
         self._queue_settings = {
             "type": self.ORCHESTRATION_QUEUE_ADAPTER or "native",
             "settings": (
-                self.ORCHESTRATION_QUEUE_SETTINGS
-                or {"backend": "memory"}
-            )
+                self.ORCHESTRATION_QUEUE_SETTINGS or {"backend": "memory"}
+            ),
         }
-        self.queue = self._load_adapter(
-            "queue", self._queue_settings["type"],
-            self._queue_settings["settings"]
+        self.queue = util.load_adapter(
+            "orchestration-queue",
+            self._queue_settings["type"],
+            self._queue_settings["settings"],
         )
         # registry
         self._registry_settings = {
             "type": self.ORCHESTRATION_REGISTRY_ADAPTER or "native",
             "settings": (
-                self.ORCHESTRATION_REGISTRY_SETTINGS
-                or {"backend": "memory"}
-            )
+                self.ORCHESTRATION_REGISTRY_SETTINGS or {"backend": "memory"}
+            ),
         }
-        self.registry = self._load_adapter(
-            "registry", self._registry_settings["type"],
-            self._registry_settings["settings"]
+        self.registry = util.load_adapter(
+            "orchestration-registry",
+            self._registry_settings["type"],
+            self._registry_settings["settings"],
         )
 
         # notifications
@@ -179,107 +161,64 @@ class OrchestratedAppConfig(BaseConfig):
                 self.ORCHESTRATION_ABORT_NOTIFICATIONS_URL,
                 "abort",
                 callback_url=self.ORCHESTRATION_ABORT_NOTIFICATIONS_CALLBACK,
-                timeout=self.ORCHESTRATION_ABORT_TIMEOUT
+                timeout=self.ORCHESTRATION_ABORT_TIMEOUT,
             )
 
         super().__init__()
 
-    def _load_adapter(
-        self, name: str, adapter: str, settings: dict
-    ) -> KeyValueStoreAdapter:
-        """
-        If valid, returns initilized instance of the requested
-        `KeyValueStoreAdapter`.
-        """
-        if (adapter not in _ORCHESTRATION_ADAPTER_OPTIONS):
-            raise ValueError(
-                f"Adapter '{adapter}' for orchestration-{name} "
-                + "is not allowed. Possible values are: "
-                + f"{', '.join(_ORCHESTRATION_ADAPTER_OPTIONS.keys())}."
-            )
-        if adapter == "native":
-            return NativeKeyValueStoreAdapter(
-                self._load_backend(
-                    name, settings.get("backend", "memory"), settings
-                )
-            )
-        if adapter == "http":
-            kwargs = {
-                k: settings.get(k) for k, v in settings.items()
-                if k in ["url", "timeout", "proxies"]
-            }
-            return HTTPKeyValueStoreAdapter(**kwargs)
-        kwargs = {
-            k: settings.get(k) for k, v in settings.items()
-            if k in [
-                "key_name", "value_name", "table", "host", "port", "user",
-                "password", "database", "pgpassfile", "additional_options"
-            ]
-        }
-        return PostgreSQLAdapter14(**kwargs)
-
-    def _load_backend(
-        self, name: str, backend: str, settings: dict
-    ) -> KeyValueStore:
-        """
-        If valid, returns initilized instance of the requested
-        `KeyValueStore`.
-        """
-        if (backend not in _ORCHESTRATION_BACKEND_OPTIONS):
-            raise ValueError(
-                f"Backend '{backend}' for orchestration-{name} "
-                + "is not allowed. Possible values are: "
-                + f"{', '.join(_ORCHESTRATION_BACKEND_OPTIONS.keys())}."
-            )
-        if backend == "memory":
-            return MemoryStore()
-        return JSONFileStore(Path(settings["dir"]))
-
     def set_identity(self):
         super().set_identity()
 
-        (self.CONTAINER_SELF_DESCRIPTION["configuration"]["settings"]
-            ["orchestration"]) = {
-                # FIXME: this should be added before in API-projects
-                # "processes": self.ORCHESTRATION_PROCESSES,
-                "at_startup": self.ORCHESTRATION_AT_STARTUP,
-                "queue": self._queue_settings,
-                "registry": self._registry_settings,
-                "token": {
-                    "expiration": self.ORCHESTRATION_TOKEN_EXPIRATION,
-                    "duration": self.ORCHESTRATION_TOKEN_DURATION,
-                },
-                "debug": self.ORCHESTRATION_DEBUG,
-                "controls_api": self.ORCHESTRATION_CONTROLS_API,
-                "abort": {
-                    "subscription": self.ORCHESTRATION_ABORT_NOTIFICATIONS,
-                }
-            }
+        (
+            self.CONTAINER_SELF_DESCRIPTION["configuration"]["settings"][
+                "orchestration"
+            ]
+        ) = {
+            # FIXME: this should be added before in API-projects
+            # "processes": self.ORCHESTRATION_PROCESSES,
+            "at_startup": self.ORCHESTRATION_AT_STARTUP,
+            "queue": self._queue_settings,
+            "registry": self._registry_settings,
+            "token": {
+                "expiration": self.ORCHESTRATION_TOKEN_EXPIRATION,
+                "duration": self.ORCHESTRATION_TOKEN_DURATION,
+            },
+            "debug": self.ORCHESTRATION_DEBUG,
+            "controls_api": self.ORCHESTRATION_CONTROLS_API,
+            "abort": {
+                "subscription": self.ORCHESTRATION_ABORT_NOTIFICATIONS,
+            },
+        }
         if self.ORCHESTRATION_ABORT_NOTIFICATIONS:
-            (self.CONTAINER_SELF_DESCRIPTION["configuration"]["settings"]
-                ["orchestration"]["abort"]["url"]) = (
-                self.ORCHESTRATION_ABORT_NOTIFICATIONS_URL
-            )
-            (self.CONTAINER_SELF_DESCRIPTION["configuration"]["settings"]
-                ["orchestration"]["abort"]["timeout"]) = (
-                {"duration": self.ORCHESTRATION_ABORT_TIMEOUT}
-            )
+            (
+                self.CONTAINER_SELF_DESCRIPTION["configuration"]["settings"][
+                    "orchestration"
+                ]["abort"]["url"]
+            ) = self.ORCHESTRATION_ABORT_NOTIFICATIONS_URL
+            (
+                self.CONTAINER_SELF_DESCRIPTION["configuration"]["settings"][
+                    "orchestration"
+                ]["abort"]["timeout"]
+            ) = {"duration": self.ORCHESTRATION_ABORT_TIMEOUT}
             if self.ORCHESTRATION_ABORT_NOTIFICATIONS_CALLBACK:
-                (self.CONTAINER_SELF_DESCRIPTION["configuration"]["settings"]
-                    ["orchestration"]["abort"]["callback"]) = (
-                    self.ORCHESTRATION_ABORT_NOTIFICATIONS_CALLBACK
-                )
+                (
+                    self.CONTAINER_SELF_DESCRIPTION["configuration"][
+                        "settings"
+                    ]["orchestration"]["abort"]["callback"]
+                ) = self.ORCHESTRATION_ABORT_NOTIFICATIONS_CALLBACK
 
         if self.ORCHESTRATION_DAEMON_INTERVAL is not None:
-            (self.CONTAINER_SELF_DESCRIPTION["configuration"]["settings"]
-                ["orchestration"]["daemon_interval"]) = (
-                    self.ORCHESTRATION_DAEMON_INTERVAL
-                )
+            (
+                self.CONTAINER_SELF_DESCRIPTION["configuration"]["settings"][
+                    "orchestration"
+                ]["daemon_interval"]
+            ) = self.ORCHESTRATION_DAEMON_INTERVAL
         if self.ORCHESTRATION_ORCHESTRATOR_INTERVAL is not None:
-            (self.CONTAINER_SELF_DESCRIPTION["configuration"]["settings"]
-                ["orchestration"]["orchestrator_interval"]) = (
-                    self.ORCHESTRATION_ORCHESTRATOR_INTERVAL
-                )
+            (
+                self.CONTAINER_SELF_DESCRIPTION["configuration"]["settings"][
+                    "orchestration"
+                ]["orchestrator_interval"]
+            ) = self.ORCHESTRATION_ORCHESTRATOR_INTERVAL
 
 
 class FSConfig(BaseConfig):
@@ -295,8 +234,11 @@ class FSConfig(BaseConfig):
     def set_identity(self):
         super().set_identity()
 
-        (self.CONTAINER_SELF_DESCRIPTION["configuration"]["settings"]
-            ["fs_mount_point"]) = str(self.FS_MOUNT_POINT)
+        (
+            self.CONTAINER_SELF_DESCRIPTION["configuration"]["settings"][
+                "fs_mount_point"
+            ]
+        ) = str(self.FS_MOUNT_POINT)
 
 
 class DBConfig(BaseConfig):
@@ -304,6 +246,7 @@ class DBConfig(BaseConfig):
     Configuration class extension for DCM web-services that access the
     database.
     """
+
     DB_ADAPTER = os.environ.get("DB_ADAPTER", "sqlite")
     DB_ADAPTER_POOL_SIZE = int(os.environ.get("DB_ADAPTER_POOL_SIZE", 1))
     DB_ADAPTER_POOL_OVERFLOW = (
