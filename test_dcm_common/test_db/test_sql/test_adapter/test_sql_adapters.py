@@ -1238,6 +1238,7 @@ def test_read_file_success(db_id, request, sql_sample_schema):
 
     assert db.read_file(sql_sample_schema).success
     assert "sample_table" in db.get_table_names().data
+    assert "sample_table2" in db.get_table_names().data
 
 
 @parametrize_sql_adapter

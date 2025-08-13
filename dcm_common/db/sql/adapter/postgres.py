@@ -231,11 +231,9 @@ class PostgreSQLAdapter14(PooledConnectionAdapter, SQLAdapter):
     def _read_file(self, path: Path) -> TransactionResult:
         try:
             return self.build_response(
+                # psycopg supports multiple statements per execute
                 self.execute(
-                    *[
-                        _Statement(s.strip())
-                        for s in path.read_text(encoding="utf-8").split(";")
-                    ],
+                    _Statement(path.read_text(encoding="utf-8")),
                     clear_schema_cache=False,
                 )
             )

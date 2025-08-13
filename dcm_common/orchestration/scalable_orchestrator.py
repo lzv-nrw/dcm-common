@@ -351,9 +351,21 @@ class ScalableOrchestrator:
         Returns `True` if currently no jobs being processed and none are
         in queue.
         """
+
+        try:
+            queue_length = len(self.queue.keys())
+        # pylint: disable=broad-exception-caught
+        except Exception as exc_info:
+            print(
+                "Orchestrator failed to poll the job-queue due to a "
+                + f"'{type(exc_info).__name__}': {exc_info}.",
+                file=sys.stderr
+            )
+            return False
+
         return (
             not self._looking_for_work.is_set()
-            and len(self.queue.keys()) == 0
+            and queue_length == 0
             and len(self._jobs) == 0
         )
 
@@ -417,7 +429,12 @@ class ScalableOrchestrator:
         if "pre-queue" in self.queue_hooks.get(config.context, {}):
             self.queue_hooks[config.context]["pre-queue"](info)
         self.registry.write(_token, info.json)
-        self.queue.write(_token, _token)
+        try:
+            self.queue.write(_token, _token)
+        # pylint: disable=broad-exception-caught
+        except Exception as exc_info:
+            self.registry.delete(_token)
+            raise exc_info
 
         if self._debug:
             self._write_debug(f"Submitted job with token '{_token}'.")
@@ -565,7 +582,17 @@ class ScalableOrchestrator:
         job.
         """
         # pop from queue
-        token = self.queue.next(True)
+        try:
+            token = self.queue.next(True)
+        # pylint: disable=broad-exception-caught
+        except Exception as exc_info:
+            print(
+                "Orchestrator failed to poll the job-queue due to a "
+                + f"'{type(exc_info).__name__}': {exc_info}.",
+                file=sys.stderr
+            )
+            return
+
         if token is None:
             return
         if self._debug:
@@ -764,7 +791,8 @@ class ScalableOrchestrator:
             self._write_debug("Received stop-signal.")
         self._stop.set()
         if block:
-            self.block_until_idle()
+            while self.running:
+                sleep(0.001)
 
     def stop_on_idle(self, block: bool = False) -> None:
         """

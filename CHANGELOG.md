@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.26.4] - 2025-08-13
+
+### Changed
+
+- improved error handling of `ScalableOrchestrator` for queue
+
+### Fixed
+
+- fixed minor issues with service-extension signaling/messages
+- fixed orchestrator not actually waiting until stopped
+- fixed issues when reading SQL-files via `SQLAdapter.read_file`
+
 ## [3.26.0] - 2025-08-13
 
 ### Changed

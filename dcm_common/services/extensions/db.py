@@ -17,7 +17,6 @@ from .common import (
 
 
 def _connect(config, db: PooledConnectionAdapter, abort, result, requirements):
-    first_try = True
     while not db.pool.is_open:
         if not _ExtensionRequirement.check_requirements(
             requirements,
@@ -28,14 +27,13 @@ def _connect(config, db: PooledConnectionAdapter, abort, result, requirements):
             db.pool.init_pool()
         # pylint: disable=broad-exception-caught
         except Exception as exc_info:
-            first_try = False
             print_status(f"Cannot connect to database: {exc_info}")
             abort.wait(config.DB_ADAPTER_STARTUP_INTERVAL)
             if abort.is_set():
                 return
-    result.ready.set()
-    if not first_try:
-        print_status("Successfully connected to database.")
+        else:
+            result.ready.set()
+            print_status("Successfully connected to database.")
 
 
 def db_loader(

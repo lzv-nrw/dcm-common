@@ -16,15 +16,32 @@ from .common import (
 )
 
 
-def _connected(client):
+def setup_connection_test_callback_with_state(initial_state: bool):
     """
-    Returns `True` if notification service is up and client is currently
-    connected.
+    Returns function to check connected-status.
     """
-    try:
-        return client.registered() and client.subscribed()
-    except requests.exceptions.RequestException:
-        return False
+    current_state = {"ok": initial_state}
+
+    def __connected(client):
+        """
+        Returns `True` if notification service is up and client is currently
+        connected.
+        """
+        try:
+            current_state["ok"] = client.registered() and client.subscribed()
+        except requests.exceptions.RequestException as exc_info:
+            if current_state["ok"]:
+                print_status(
+                    "Lost connection to notification service "
+                    + f"({type(exc_info).__name__})."
+                )
+            current_state["ok"] = False
+        return current_state["ok"]
+
+    return __connected
+
+
+_connected = setup_connection_test_callback_with_state(False)
 
 
 def _connect(
@@ -37,7 +54,6 @@ def _connect(
     Attempts to (re-)connect to notification service (blocks until
     connected).
     """
-    first_try = True
     while not _connected(config.abort_notification_client):
         if not _ExtensionRequirement.check_requirements(
             requirements,
@@ -46,9 +62,7 @@ def _connect(
             continue
         try:
             config.abort_notification_client.connect()
-            result.ready.set()
         except requests.exceptions.RequestException as exc_info:
-            first_try = False
             result.ready.clear()
             print_status(
                 "Cannot connect to notification service "
@@ -59,8 +73,9 @@ def _connect(
             )
             if abort.is_set():
                 return
-    if not first_try:
-        print_status("Successfully connected to notification service.")
+        else:
+            result.ready.set()
+            print_status("Successfully connected to notification service.")
 
 
 # FIXME: drop legacy support

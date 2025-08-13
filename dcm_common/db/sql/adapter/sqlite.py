@@ -159,20 +159,28 @@ class SQLiteAdapter3(PooledConnectionAdapter, SQLAdapter):
         return raw
 
     def _read_file(self, path: Path) -> TransactionResult:
+        # sqlite-module provides executescript method
+        # parse as single statement
         try:
-            return self.build_response(
-                self.execute(
-                    *[
-                        _Statement(s.strip())
-                        for s in path.read_text(encoding="utf-8").split(";")
-                    ],
-                    clear_schema_cache=False,
-                )
-            )
+            statement = _Statement(path.read_text(encoding="utf-8"))
         except FileNotFoundError as exc_info:
             return self.build_response(
                 RawTransactionResult([], error=exc_info)
             )
+
+        with self.pool.get_claim(timeout=self.connection_timeout) as c:
+            # run as script
+            try:
+                result = c.cursor.executescript(statement.value).fetchall()
+            # pylint: disable=broad-exception-caught
+            except Exception as exc_info:
+                return self.build_response(
+                    RawTransactionResult([statement], error=exc_info)
+                )
+
+        return self.build_response(
+            RawTransactionResult([statement], data=result)
+        )
 
     @lru_cache(maxsize=1)
     def _get_table_names(self) -> TransactionResult:
