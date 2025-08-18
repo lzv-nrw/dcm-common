@@ -105,7 +105,17 @@ class Report(DataModel):
     @classmethod
     def token_serialization(cls, value):
         """Performs `token`-serialization."""
-        return value.json if value is not None else None
+        if value is None:
+            DataModel.skip()
+        return value.json
+
+    @DataModel.deserialization_handler("token")
+    @classmethod
+    def token_deserialization(cls, value):
+        """Performs `token`-deserialization."""
+        if value is None:
+            DataModel.skip()
+        return Token.from_json(value)
 
     @DataModel.serialization_handler("args")
     @classmethod

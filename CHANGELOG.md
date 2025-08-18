@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.26.7] - 2025-08-18
+
+### Added
+
+- added post-abort hook option to default abort-endpoint in `views.OrchestratedView._register_abort_job`
+
+### Fixed
+
+- fixed custom handlers for `Token` and `Report`
+
 ## [3.26.5] - 2025-08-13
 
 ### Fixed

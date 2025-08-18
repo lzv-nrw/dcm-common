@@ -48,18 +48,22 @@ class Token(DataModel):
             if self.expires:
                 self.expires_at = now() + timedelta(seconds=duration)
             else:
-                self.expires_at = now()
+                self.expires_at = None
 
     @DataModel.serialization_handler("expires_at")
     @classmethod
     def expires_at_serialization(cls, value):
         """Performs `expires_at`-serialization."""
+        if value is None:
+            DataModel.skip()
         return value.isoformat()
 
     @DataModel.deserialization_handler("expires_at")
     @classmethod
     def expires_at_deserialization(cls, value):
         """Performs `expires_at`-deserialization."""
+        if value is None:
+            DataModel.skip()
         return datetime.fromisoformat(value)
 
     def expired(self) -> bool:

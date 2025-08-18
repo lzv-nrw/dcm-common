@@ -55,9 +55,54 @@ def test_token_expired():
 
 
 test_token_json = get_model_serialization_test(
-    Token, (
+    Token,
+    (
         ((), {}),
         ((), {"expires": True}),
         ((), {"value": "token-value"}),
-    )
+        ((), {"value": "token-value", "expires_at": None, "expires": False}),
+        (
+            (),
+            {
+                "value": "token-value",
+                "expires_at": "2025-01-01",
+                "expires": True,
+            },
+        ),
+    ),
 )
+
+
+def test_token_from_json_expires_false():
+    """
+    Test behavior for `Token.from_json` in case of `not expires` and/or
+    `expires_at == None`.
+    """
+
+    assert "expires_at" not in Token.from_json(
+        {
+            "value": "token-value",
+            "expires_at": None,
+            "expires": False,
+        }
+    ).json
+    assert "expires_at" not in Token.from_json(
+        {
+            "value": "token-value",
+            "expires": False,
+        }
+    ).json
+    assert "expires_at" not in Token.from_json(
+        {
+            "value": "token-value",
+            "duration": 1,
+            "expires": False,
+        }
+    ).json
+    assert "expires_at" in Token.from_json(
+        {
+            "value": "token-value",
+            "duration": 1,
+            "expires": True,
+        }
+    ).json

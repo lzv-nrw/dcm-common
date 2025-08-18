@@ -2,7 +2,7 @@
 View-class interface definition
 """
 
-from typing import Optional, Mapping
+from typing import Optional, Mapping, Callable
 import abc
 
 from flask import Blueprint, request, Response
@@ -161,7 +161,12 @@ class OrchestratedView(View, JobFactory):  # pylint: disable=abstract-method
             )
 
     def _register_abort_job(
-        self, bp: Blueprint, rule: str, options: Optional[Mapping] = None
+        self,
+        bp: Blueprint,
+        rule: str,
+        options: Optional[Mapping] = None,
+        *,
+        post_abort_hook: Optional[Callable[[str], None]] = None,
     ) -> None:
         """
         Can be used to register a default abort-route for the given
@@ -171,6 +176,10 @@ class OrchestratedView(View, JobFactory):  # pylint: disable=abstract-method
         bp -- `Blueprint`-instance to be configured
         rule -- url path for this route (e.g. '/import')
         options -- additional werkzeug-options
+        post_abort_hook -- hook that gets executed after the default
+                           abort-routine is completed; gets passed the
+                           token as positional argument
+                           (default None)
         """
         @bp.route(rule, methods=["DELETE"], **(options or {}))
         @flask_handler(
@@ -199,6 +208,7 @@ class OrchestratedView(View, JobFactory):  # pylint: disable=abstract-method
                         },
                         json=request.json
                     )
+                # pylint: disable=broad-exception-caught
                 except Exception as exc_info:
                     r = Response(
                         "error while making abort-request to notification "
@@ -213,6 +223,10 @@ class OrchestratedView(View, JobFactory):  # pylint: disable=abstract-method
                 block=True,
                 re_queue=re_queue
             )
+
+            if post_abort_hook is not None:
+                post_abort_hook(token)
+
             return r or Response(
                 f"successfully aborted '{token}'",
                 mimetype="text/plain",
