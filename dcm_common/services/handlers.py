@@ -2,6 +2,7 @@
 
 from typing import Any
 from pathlib import Path
+from functools import partial
 from importlib.metadata import version
 
 from data_plumber_http import Property, Object, String, FileSystemObject
@@ -29,6 +30,14 @@ report_handler = Object(
     },
     accept_only=["token"]
 ).assemble()
+
+
+UUID = partial(
+    String,
+    enum=None,
+    pattern=r"[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}",
+)
+"""Regular string with uuid-format."""
 
 
 class TargetPath(FileSystemObject):

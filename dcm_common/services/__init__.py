@@ -1,5 +1,5 @@
 from .handlers import (
-    no_args_handler, TargetPath, abort_query_handler, abort_body_handler
+    no_args_handler, UUID, TargetPath, abort_query_handler, abort_body_handler
 )
 from .config import BaseConfig, FSConfig, OrchestratedAppConfig, DBConfig
 from .views.interface import View, JobFactory, OrchestratedView
@@ -15,6 +15,7 @@ from .adapter.interface import APIResult, ServiceAdapter
 
 __all__ = [
     "no_args_handler",
+    "UUID",
     "TargetPath",
     "abort_query_handler",
     "abort_body_handler",

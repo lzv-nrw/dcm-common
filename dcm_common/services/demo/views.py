@@ -5,7 +5,7 @@ Demo View-class definition
 from typing import Optional
 from time import sleep
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, Response
 from data_plumber_http.decorators import flask_handler, flask_args, flask_json
 from dcm_common import LoggingContext as Context
 from dcm_common.plugins.demo import DemoPlugin
@@ -55,6 +55,7 @@ class DemoView(services.OrchestratedView):
         super().__init__(config, *args, **kwargs)
 
     def configure_bp(self, bp: Blueprint, *args, **kwargs) -> None:
+
         @bp.route("/demo", methods=["POST"])
         @flask_handler(
             handler=services.no_args_handler,
@@ -64,17 +65,29 @@ class DemoView(services.OrchestratedView):
             handler=get_demo_handler(self.config.AVAILABLE_PLUGINS),
             json=flask_json,
         )
-        def demo(demo: DemoConfig, callback_url: Optional[str] = None):
+        def demo(
+            demo: DemoConfig,
+            token: Optional[str] = None,
+            callback_url: Optional[str] = None,
+        ):
             """Submit job."""
-            token = self.orchestrator.submit(
-                JobConfig(
-                    request_body={
-                        "demo": demo.json,
-                        "callback_url": callback_url,
-                    },
-                    context=self.NAME,
+            try:
+                token = self.orchestrator.submit(
+                    JobConfig(
+                        request_body={
+                            "demo": demo.json,
+                            "callback_url": callback_url,
+                        },
+                        context=self.NAME,
+                    ),
+                    token=token,
                 )
-            )
+            except ValueError as exc_info:
+                return Response(
+                    f"Submission rejected: {exc_info}",
+                    mimetype="text/plain",
+                    status=400,
+                )
             return jsonify(token.json), 201
 
         self._register_abort_job(bp, "/demo")

@@ -290,7 +290,6 @@ def test_abort_requeue(queue, registry):
     assert token.value == token_ == token__
     info = registry.read(token.value)
     assert list(info["metadata"].keys()) == ["produced"]
-    assert info["report"] == {}
 
 
 def test_hooks_link_job_log_and_abort_with_reason(queue, registry, debug):

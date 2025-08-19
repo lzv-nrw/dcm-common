@@ -280,9 +280,9 @@ class ScalableOrchestrator:
         self._stop = Event()
         self._stop_on_idle = Event()
         self._looking_for_work = Event()  # used to signal 'not idling' in
-                                          # the short interval between popping
-                                          # a token from the queue and
-                                          # registering a new job in self._jobs
+        # the short interval between popping
+        # a token from the queue and
+        # registering a new job in self._jobs
         self._skip_sleep = Event()
         self._jobs: dict[str, _JobRecord] = {}
         self._hostname = (
@@ -409,7 +409,25 @@ class ScalableOrchestrator:
         else:
             # use existing token
             _token = self._get_token_value(token)
-            self.registry.write(_token, None)
+            # FIXME: with bad timing, this check can fail; a fix requires
+            # refactoring of how queue and registry work
+            info = self.registry.read(_token)
+            if info is False:
+                # in process of being created but not ready yet
+                raise ValueError(
+                    f"Job-creation for token '{_token}' still in progress."
+                )
+            if info is not None:
+                if (
+                    info.get("config", {}).get("original_body", {})
+                    != config.original_body
+                ):
+                    raise ValueError(
+                        f"Duplicate request token '{_token}' with different "
+                        + "request body."
+                    )
+                return Token.from_json({"value": _token} | info.get("token"))
+            self.registry.write(_token, False)
 
         # create info-record
         info = JobInfo(
@@ -509,7 +527,18 @@ class ScalableOrchestrator:
                         self._write_debug(
                             f"Re-submitting job with token '{token}'."
                         )
-                    self.submit(record.info.config, token)
+                    # reset registry and post to queue
+                    self.registry.write(
+                        token,
+                        JobInfo(
+                            record.info.config,
+                            token=record.info.token,
+                            metadata=JobMetadata(
+                                produced=MetadataRecord(by=self._hostname)
+                            ),
+                        ).json,
+                    )
+                    self.queue.write(token, token)
                     completed_jobs.append(token)
                     # skip manual registry update (must not write to
                     # registry after submission to queue)
@@ -675,7 +704,7 @@ class ScalableOrchestrator:
             # start new job if needed and available
             if len(self._jobs) < self.nprocesses and not stop.is_set():
                 with self._abort_lock:  # ensure all abortions are registered
-                                        # either via queue or self._jobs
+                    # either via queue or self._jobs
                     self._looking_for_work.set()
                     self._run_next_in_queue(cwd)
 
@@ -922,7 +951,7 @@ class ScalableOrchestrator:
                  (default False)
         """
         with self._abort_lock:  # ensure all abortions are registered
-                                # either via queue or self._jobs
+            # either via queue or self._jobs
             if token is None:
                 records = list(self._jobs.values())
             else:

@@ -3,16 +3,16 @@ This module defines the `ServiceAdapter`-interface.
 """
 
 from typing import Optional, Any, Callable
+import sys
 from dataclasses import dataclass
 import abc
 from time import sleep, time
 import json
-from urllib3.exceptions import MaxRetryError, ReadTimeoutError
+from urllib3.exceptions import HTTPError, MaxRetryError, ReadTimeoutError
 
 from dcm_common.logger import LoggingContext as Context, LogMessage
 from dcm_common.models.report import Status
-from dcm_common.models import Token
-from dcm_common.models import JSONObject, DataModel
+from dcm_common.models import Token, JSONObject, DataModel
 
 
 @dataclass
@@ -57,6 +57,13 @@ class ServiceAdapter(metaclass=abc.ABCMeta):
     request_timeout -- timeout duration for the submission of a request
                        to a service in seconds
                        (default None uses class attribute `REQUEST_TIMEOUT`)
+    max_retries -- number retries before giving up
+                   (default 0)
+    retry_interval -- duration between retries
+                      (default 1)
+    retry_on -- exception type or tuple of exception types for which a
+                retry should be performed
+                (default urllib3.exceptions.HTTPError)
     """
 
     @classmethod
@@ -83,6 +90,9 @@ class ServiceAdapter(metaclass=abc.ABCMeta):
         interval: float = 1,
         timeout: float = 360,
         request_timeout: Optional[float] = None,
+        max_retries: int = 0,
+        retry_interval: float = 1.0,
+        retry_on: type[Exception] | tuple[type[Exception], ...] = HTTPError,
     ) -> None:
         self._url = url
         self.interval = interval
@@ -92,6 +102,10 @@ class ServiceAdapter(metaclass=abc.ABCMeta):
             if request_timeout is not None
             else self.REQUEST_TIMEOUT
         )
+        self.max_retries = max_retries
+        self.retry_interval = retry_interval
+        self.retry_on = retry_on
+
         self._default_api_client, self._api_client = self._get_api_clients()
         self._progress_endpoint = self._get_progress_endpoint(self._api_client)
         self._report_endpoint = self._get_report_endpoint(self._api_client)
@@ -164,6 +178,29 @@ class ServiceAdapter(metaclass=abc.ABCMeta):
             f"{self.__class__.__name__} missing implementation of `success`."
         )
 
+    def retry(self, request: Callable[[], Any], context: str) -> Any:
+        """
+        Runs request with retries and returns result. If an error
+        occurs, it is logged in stderr. If the maximum number of retries
+        is exceeded, the last exception is raised.
+        """
+        exc_info = None
+        for retry in range(self.max_retries + 1):
+            try:
+                return request()
+            except self.retry_on as _exc_info:
+                print(
+                    f"Service adapter '{self._SERVICE_NAME}' failed to "
+                    + f"{context}: {_exc_info}",
+                    file=sys.stderr,
+                )
+                exc_info = _exc_info
+                if retry < self.max_retries:
+                    sleep(self.retry_interval)
+        if exc_info is not None:
+            raise exc_info
+        return None
+
     def _finalize_with_error(
         self, info: APIResult, status_msg: str, log_msg: str,
         args: Optional[dict] = None
@@ -221,8 +258,11 @@ class ServiceAdapter(metaclass=abc.ABCMeta):
         successful.
         """
         try:
-            response = endpoint(
-                request_body, _request_timeout=self.request_timeout
+            response = self.retry(
+                lambda: endpoint(
+                    request_body, _request_timeout=self.request_timeout
+                ),
+                "submit a request",
             )
         except ReadTimeoutError as exc_info:
             self._finalize_with_error(
@@ -318,12 +358,14 @@ class ServiceAdapter(metaclass=abc.ABCMeta):
         timeout.
         """
         t0 = time()
-        while time() - t0 < self.timeout:
+        t1 = t0
+        while t1 - t0 < self.timeout:
             self.get_info(token, info=info)
             self._run_hooks(update_hooks, info)
             if info.completed:
                 return
-            sleep(self.interval)
+            sleep(max(0, self.interval - (time() - t1)))
+            t1 = time()
         self._finalize_with_error(
             info,
             status_msg="service timed out",
@@ -333,9 +375,14 @@ class ServiceAdapter(metaclass=abc.ABCMeta):
         self._run_hooks(update_hooks, info)
 
     def run(
-        self, base_request_body: dict, target: Any, info: APIResult,
-        post_submission_hooks: Optional[tuple[Callable[[str], None], ...]] = None,
-        update_hooks: Optional[tuple[Callable[[str], None], ...]] = None
+        self,
+        base_request_body: dict,
+        target: Any,
+        info: APIResult,
+        post_submission_hooks: Optional[
+            tuple[Callable[[str], None], ...]
+        ] = None,
+        update_hooks: Optional[tuple[Callable[[str], None], ...]] = None,
     ) -> None:
         """
         Make a synchronous call to the associated service and
@@ -409,8 +456,11 @@ class ServiceAdapter(metaclass=abc.ABCMeta):
         else:
             _info = info
         try:
-            response = (endpoint or self._progress_endpoint)(
-                token, _request_timeout=self.request_timeout
+            response = self.retry(
+                lambda: (endpoint or self._progress_endpoint)(
+                    token, _request_timeout=self.request_timeout
+                ),
+                "fetch a report",
             )
             self._update_info_report(response.to_dict(), _info)
             if endpoint is None:

@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.28.0] - 2025-08-19
+
+### Added
+
+- added `UUID` type to `services.handlers`
+- added retry-mechanism to `services.adapter.ServiceAdapter`-interface
+
+### Fixed
+
+- improved support for `token` being passed into `ScalableOrchestrator.submit`
+
 ## [3.26.7] - 2025-08-18
 
 ### Added

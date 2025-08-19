@@ -280,6 +280,81 @@ def test_run_job_timeout(
     assert "timed out" in str(info.report)
 
 
+def test_run_retry(
+    adapter: _TestAdapter, request_body, port, token, report, run_service
+):
+    """
+    Test retry-behavior of method `run` of `_TestAdapter`.
+    """
+
+    adapter.max_retries = 2
+    adapter.retry_interval = 0
+    adapter.request_timeout = 0.01
+    retry_submission = 0
+    retry_report = 0
+
+    def submission_success_on_second_try():
+        nonlocal retry_submission
+        if retry_submission < adapter.max_retries:
+            retry_submission += 1
+            sleep(2*adapter.request_timeout)
+        return token, 201
+
+    def report_success_on_second_try():
+        nonlocal retry_report
+        # factor 4 due to OpenAPI tools-client's auto-retry for GET
+        if retry_report < 4*adapter.max_retries:
+            retry_report += 1
+            sleep(2*adapter.request_timeout)
+        return report, 200
+
+    run_service(
+        routes=[
+            ("/import/external", submission_success_on_second_try, ["POST"]),
+            ("/report", report_success_on_second_try, ["GET"]),
+        ],
+        port=port
+    )
+
+    adapter.run(request_body, None, info := APIResult())
+
+    assert info.completed
+    assert info.success
+
+
+def test_run_retry_fail(
+    adapter: _TestAdapter, request_body, port, token, report, run_service
+):
+    """
+    Test retry-behavior of method `run` of `_TestAdapter`.
+    """
+
+    adapter.max_retries = 1
+    adapter.request_timeout = 0.01
+    retry = 0
+
+    def success_on_second_try():
+        nonlocal retry
+        if retry < adapter.max_retries + 1:
+            retry += 1
+            sleep(2*adapter.request_timeout)
+        return token, 201
+
+    run_service(
+        routes=[
+            ("/import/external", success_on_second_try, ["POST"]),
+            ("/report", lambda: (report, 200), ["GET"]),
+        ],
+        port=port
+    )
+
+    adapter.run(request_body, None, info := APIResult())
+
+    assert info.completed
+    assert not info.success
+    assert "timed out" in str(info.report)
+
+
 def test_success(adapter: _TestAdapter, run_result: APIResult):
     """Test method `success` of `_TestAdapter`."""
     assert adapter.success(run_result)

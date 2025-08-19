@@ -13,6 +13,7 @@ from data_plumber_http import (
 
 from dcm_common.plugins import PluginInterface
 from dcm_common.services.plugins import PluginType
+from dcm_common.services.handlers import UUID
 from .models import DemoConfig
 
 
@@ -49,9 +50,10 @@ def get_demo_handler(demo_plugins: Mapping[str, PluginInterface]):
                     "children",
                 ],
             ),
+            Property("token"): UUID(),
             Property("callbackUrl", name="callback_url"): Url(
                 schemes=["http", "https"]
             ),
         },
-        accept_only=["demo", "callbackUrl"],
+        accept_only=["demo", "token", "callbackUrl"],
     ).assemble()

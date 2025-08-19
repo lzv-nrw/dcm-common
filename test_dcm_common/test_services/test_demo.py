@@ -4,6 +4,7 @@ Test module for the Demo Service API.
 
 from time import time, sleep
 import re
+from uuid import uuid4
 
 import pytest
 
@@ -510,3 +511,56 @@ def test_sdk_demo_plugin(demo_app, demo_client, run_service):
     assert report["progress"]["status"] == "completed"
     assert not report["data"]["success"]
     assert "demo-plugin" in str(report["log"])
+
+
+@pytest.mark.skipif(not sdk_available, reason="missing dcm-demo-sdk")
+def test_sdk_demo_submit_with_token(demo_app, demo_client, run_service):
+    """Run test for demo-app with minimal job and providing token."""
+    run_service(app=demo_app, port=8080)
+    demo_api: dcm_demo_sdk.DemoApi = demo_client("http://localhost:8080")
+    _token = str(uuid4())
+    token = demo_api.demo(
+        {
+            "demo": {"duration": 1},
+            "token": _token
+        }
+    )
+    assert token.value == _token
+    with pytest.raises(dcm_demo_sdk.ApiException) as exc_info:
+        demo_api.get_report(token.value).progress.status
+
+    # repeat submission (same token)
+    token = demo_api.demo(
+        {
+            "demo": {"duration": 1},
+            "token": _token
+        }
+    )
+    assert token.value == _token
+    with pytest.raises(dcm_demo_sdk.ApiException) as exc_info:
+        demo_api.get_report(token.value).progress.status
+
+    wait_for_report(demo_api, token).model_dump()
+
+    # repeat again post-job (same token)
+    token = demo_api.demo(
+        {
+            "demo": {"duration": 1},
+            "token": _token
+        }
+    )
+    assert token.value == _token
+
+    # already completed
+    report = demo_api.get_report(token.value)
+    assert report.progress.status == "completed"
+
+    # submission fails if configuration changed (same token)
+    with pytest.raises(dcm_demo_sdk.ApiException) as exc_info:
+        demo_api.demo(
+            {
+                "demo": {"duration": 0},
+                "token": _token
+            }
+        )
+    print(exc_info.value)
