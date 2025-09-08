@@ -11,7 +11,12 @@ import os
 import sys
 
 from flask import (
-    Flask, Blueprint, Response, jsonify, request, send_from_directory
+    Flask,
+    Blueprint,
+    Response,
+    jsonify,
+    request,
+    send_from_directory,
 )
 
 from dcm_common.db import KeyValueStore
@@ -31,9 +36,7 @@ def bp_factory(
     bp = Blueprint(name or "db", __name__)
 
     # load config-info
-    db_info = {
-        "backend": db.__class__.__name__
-    }
+    db_info = {"backend": db.__class__.__name__}
 
     if hasattr(db, "dir"):
         db_info["dir"] = str(db.dir.resolve())
@@ -52,9 +55,7 @@ def bp_factory(
         with db_lock:
             keys = db.keys()
             if not keys:
-                return Response(
-                    "Empty database.", 404, mimetype="text/plain"
-                )
+                return Response("Empty database.", 404, mimetype="text/plain")
             value = db.read(keys[0])
             if "pop" in request.args:
                 db.delete(keys[0])
@@ -94,17 +95,14 @@ def bp_factory(
 
     @bp.route("/config", methods=["GET"])
     def config():
-        return jsonify(
-            {"database": db_info, "cors": cors is not None}
-        ), 200
+        return jsonify({"database": db_info, "cors": cors is not None}), 200
 
     @bp.route("/api", methods=["GET"])
     def api():
         return send_from_directory(
-            Path(__file__).parent,
-            "openapi.yaml",
-            mimetype="application/yaml"
+            Path(__file__).parent, "openapi.yaml", mimetype="application/yaml"
         )
+
     return bp
 
 
@@ -127,7 +125,7 @@ def app_factory(db: KeyValueStore, name: Optional[str] = None) -> Flask:
             print(
                 "WARNING: Missing package 'Flask-CORS' for 'ALLOW_CORS=1'. "
                 + "CORS-requests will not work.",
-                file=sys.stderr
+                file=sys.stderr,
             )
         else:
             cors = CORS(app)

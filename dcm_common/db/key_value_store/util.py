@@ -5,7 +5,6 @@ from pathlib import Path
 from .adapter.interface import KeyValueStoreAdapter
 from .adapter.native import NativeKeyValueStoreAdapter
 from .adapter.http import HTTPKeyValueStoreAdapter
-from .adapter.postgres import PostgreSQLAdapter14
 from .backend.interface import KeyValueStore
 from .backend.memory import MemoryStore
 from .backend.disk import JSONFileStore
@@ -14,7 +13,6 @@ from .backend.disk import JSONFileStore
 ADAPTER_OPTIONS = {
     "native": NativeKeyValueStoreAdapter,
     "http": HTTPKeyValueStoreAdapter,
-    "postgres14": PostgreSQLAdapter14,
 }
 BACKEND_OPTIONS = {
     "memory": MemoryStore,
@@ -45,24 +43,7 @@ def load_adapter(
             if k in ["url", "timeout", "proxies"]
         }
         return HTTPKeyValueStoreAdapter(**kwargs)
-    kwargs = {
-        k: settings.get(k)
-        for k, v in settings.items()
-        if k
-        in [
-            "key_name",
-            "value_name",
-            "table",
-            "host",
-            "port",
-            "user",
-            "password",
-            "database",
-            "pgpassfile",
-            "additional_options",
-        ]
-    }
-    return PostgreSQLAdapter14(**kwargs)
+    raise ValueError(f"Unknown adapter type '{adapter}'.")
 
 
 def load_backend(name: str, backend: str, settings: dict) -> KeyValueStore:

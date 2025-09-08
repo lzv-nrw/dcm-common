@@ -4,11 +4,12 @@ from typing import Callable, Optional
 import urllib
 from time import sleep, time
 from uuid import uuid4
-from multiprocessing import Process
 from shutil import rmtree, copytree
 
 import pytest
 from flask import Flask
+
+from dcm_common.orchestra import DilledProcess
 
 
 def _fs_setup(source, target):
@@ -47,21 +48,18 @@ def fs_cleanup(request, file_storage):
 
 @pytest.fixture(name="wait_for_report")
 def wait_for_report():
-    def _(
-        client, token, interval: float = 0.25, max_sleep: int = 250
-    ):
+    def _(client, token, interval: float = 0.25, max_sleep: int = 250):
         """Helper for report collection."""
         max_sleep = 250
         c_sleep = 0
         while c_sleep < max_sleep:
             sleep(interval)
-            response = client.get(
-                f"/report?token={token}"
-            )
+            response = client.get(f"/report?token={token}")
             if response.status_code == 200:
                 break
             c_sleep = c_sleep + 1
         return response.json
+
     return _
 
 
@@ -86,12 +84,10 @@ def external_service() -> Callable:
 
         for route, view, methods in routes:
             app.add_url_rule(
-                route,
-                endpoint=str(uuid4()),
-                view_func=view,
-                methods=methods
+                route, endpoint=str(uuid4()), view_func=view, methods=methods
             )
         return app
+
     return _
 
 
@@ -122,7 +118,7 @@ def run_service(request, external_service) -> Callable:
         app_config=None,
         timeout: float = 5,
         probing_path: Optional[str] = None,
-    ) -> Process:
+    ) -> DilledProcess:
         generate_probing_path = probing_path is None
         if generate_probing_path:
             probing_path = PROBING_PATH
@@ -133,27 +129,34 @@ def run_service(request, external_service) -> Callable:
             else:
                 _app = app or external_service(routes, app_config)
 
+            # disable werkzeug logging
+            # pylint: disable=import-outside-toplevel
+            import logging
+
+            log = logging.getLogger("werkzeug")
+            log.setLevel(logging.ERROR)
+
             if generate_probing_path:
+
                 @_app.route(
-                    f"/{PROBING_PATH}", methods=["GET"],
-                    provide_automatic_options=False
+                    f"/{PROBING_PATH}",
+                    methods=["GET"],
+                    provide_automatic_options=False,
                 )
                 def fixture_is_running():
                     """Used to probe whether service has started up."""
                     return "OK", 200
 
-            _app.run(
-                host="0.0.0.0",
-                port=port,
-                debug=False
-            )
-        p = Process(target=run_process)
+            _app.run(host="0.0.0.0", port=port, debug=False)
+
+        p = DilledProcess(target=run_process)
         p.start()
 
         def kill_process():
             if p.is_alive():
                 p.kill()
                 p.join()
+
         request.addfinalizer(kill_process)
 
         # wait for service to have started up
@@ -161,13 +164,17 @@ def run_service(request, external_service) -> Callable:
         running = False
         while not running and time() - t0 < timeout:
             try:
-                running = urllib.request.urlopen(
-                    f"http://localhost:{port}/{probing_path}"
-                ).status == 200
+                running = (
+                    urllib.request.urlopen(
+                        f"http://localhost:{port}/{probing_path}"
+                    ).status
+                    == 200
+                )
             except (urllib.error.URLError, ConnectionResetError):
                 sleep(0.01)
         if not running:
             raise RuntimeError("Service did not start.")
 
         return p
+
     yield _

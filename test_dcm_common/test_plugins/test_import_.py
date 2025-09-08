@@ -45,9 +45,12 @@ def test_import_from_file_empty(plugin_directory: Path):
 
 def test_import_from_file_filter(plugin_directory: Path):
     """Test function `import_from_file` for simple scenario."""
-    assert import_from_file(
-        plugin_directory / "a.py", filter_=lambda p: p.context == "unknown"
-    ) is None
+    assert (
+        import_from_file(
+            plugin_directory / "a.py", filter_=lambda p: p.context == "unknown"
+        )
+        is None
+    )
 
 
 def test_import_from_directory_minimal(plugin_directory: Path):

@@ -20,9 +20,7 @@ class AppConfig(FSConfig, OrchestratedAppConfig, DBConfig):
         )
 
         # version
-        self.CONTAINER_SELF_DESCRIPTION["version"]["api"] = (
-            "0.0.0"
-        )
+        self.CONTAINER_SELF_DESCRIPTION["version"]["api"] = "0.0.0"
         self.CONTAINER_SELF_DESCRIPTION["version"]["app"] = version(
             "dcm-common"
         )

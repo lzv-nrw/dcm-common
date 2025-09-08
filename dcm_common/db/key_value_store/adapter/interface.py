@@ -23,6 +23,7 @@ class KeyValueStoreAdapter(metaclass=abc.ABCMeta):
     * `delete` delete given key
     * `keys` list existing keys
     """
+
     @classmethod
     def __subclasshook__(cls, subclass):
         return (

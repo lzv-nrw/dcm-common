@@ -16,6 +16,7 @@ class ExtensionLoaderResult:
 
     data: Optional[Any] = None
     ready: Event = field(default_factory=Event)
+    stop: Callable[..., None] = lambda *args, **kwargs: None
 
     def toggle(self) -> "ExtensionLoaderResult":
         """
@@ -40,9 +41,7 @@ class _ExtensionRequirement:
             return True
         if fmt:
             for r in unmet:
-                print_status(
-                    fmt.format(r.name)
-                )
+                print_status(fmt.format(r.name))
         return False
 
 
@@ -77,6 +76,7 @@ class ExtensionConditionRequirement(_ExtensionRequirement):
 
 class PrintStatusSettings:
     """Settings for the `print_status` helper."""
+
     time0 = time()
     silent = False
     file = sys.stderr

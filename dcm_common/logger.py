@@ -23,7 +23,7 @@ class LogMessage:
         self,
         body: str,
         origin: Optional[str] = None,
-        datetime: Optional[datetime_] = None
+        datetime: Optional[datetime_] = None,
     ) -> None:
         self.body = body
         self.origin = origin
@@ -83,7 +83,7 @@ class LogMessage:
         """
         return LogMessage(
             body=self.body.format(*args, **kwargs),
-            origin=origin or self.origin
+            origin=origin or self.origin,
         )
 
 
@@ -109,6 +109,7 @@ class LoggingContext(Enum):
         """
         Get stringified `LoggingContext` decorated with ANSI-color.
         """
+
         # fancy colors
         class FancyColors:
             ERROR = "\033[31m"
@@ -123,10 +124,12 @@ class LoggingContext(Enum):
             AUTHENTICATION = "\033[93m"
             SECURITY = "\033[91m"
             RESTORE = "\033[0m"
-        return \
-            getattr(FancyColors, self.name, FancyColors.RESTORE) \
-            + self.value \
+
+        return (
+            getattr(FancyColors, self.name, FancyColors.RESTORE)
+            + self.value
             + FancyColors.RESTORE
+        )
 
 
 class Logger:
@@ -143,11 +146,12 @@ class Logger:
     json -- serialized `Logger` to use for initialization
             (default None)
     """
+
     def __init__(
         self,
         default_origin: Optional[str] = None,
         fmt: Optional[str] = None,
-        json: Optional[dict[str, list[dict[str, Optional[str]]]]] = None
+        json: Optional[dict[str, list[dict[str, Optional[str]]]]] = None,
     ) -> None:
         self.report: dict[LoggingContext, list[LogMessage]] = {}
         self._origin = default_origin
@@ -156,14 +160,17 @@ class Logger:
             for context, msgs in json.items():
                 _context = getattr(LoggingContext, context)
                 self.log(
-                    _context,
-                    *[LogMessage.from_json(msg) for msg in msgs]
+                    _context, *[LogMessage.from_json(msg) for msg in msgs]
                 )
 
     @property
     def default_origin(self) -> Optional[str]:
         """Returns `Logger`'s default-origin."""
         return self._origin
+
+    def set_default_origin(self, origin: str) -> None:
+        """Set `Logger`'s default-origin."""
+        self._origin = origin
 
     @property
     def json(self) -> dict[str, list[dict[str, Optional[str]]]]:
@@ -173,27 +180,19 @@ class Logger:
         `LogMessages` within a `Logger` necessarily have an origin
         (hence the given return signature)
         """
-        return {
-            k.name: [m.json for m in v] for k, v in self.report.items()
-        }
+        return {k.name: [m.json for m in v] for k, v in self.report.items()}
 
     @classmethod
     def from_json(cls, json) -> "Logger":
         """Initialize from `JSONObject`."""
         return cls(json=json)
 
-    def _check_origin(self, origin):
-        _origin = origin or self.default_origin
-        if _origin is None:
-            raise TypeError("Missing argument 'origin'.")
-        return _origin
-
     def log(
         self,
         context: LoggingContext,
         *args: LogMessage,
         body: Optional[str | list[str]] = None,
-        origin: Optional[str] = None
+        origin: Optional[str] = None,
     ) -> None:
         """
         Add message(s) to log.
@@ -218,12 +217,10 @@ class Logger:
                     "Logger.log args expected type 'LogMessage' "
                     + f"but found '{type(msg).__name__}'."
                 )
-            self.report[context].append(
-                msg
-            )
+            self.report[context].append(msg)
 
         if body is not None:
-            _origin = self._check_origin(origin)
+            _origin = origin or self.default_origin or "unknown"
 
             if isinstance(body, list):
                 _body = body
@@ -231,15 +228,13 @@ class Logger:
                 _body = [body]
 
             for b in _body:
-                self.report[context].append(
-                    LogMessage(body=b, origin=_origin)
-                )
+                self.report[context].append(LogMessage(body=b, origin=_origin))
 
     def pick(
         self,
         *args: LoggingContext,
         complement: bool = False,
-        default_origin: Optional[str] = None
+        default_origin: Optional[str] = None,
     ) -> "Logger":
         """
         Returns a new `Logger` that contains only the given contexts or
@@ -282,9 +277,7 @@ class Logger:
         return logger
 
     def merge(
-        self,
-        logger: "Logger",
-        contexts: Optional[list[LoggingContext]] = None
+        self, logger: "Logger", contexts: Optional[list[LoggingContext]] = None
     ) -> None:
         """
         Merge logger-report contents (report_source) into this report.
@@ -354,21 +347,30 @@ class Logger:
                 else:
                     lines.append(context.value)
             # messages
-            lines += list(map(
-                lambda x: (
+            lines += list(
+                map(
+                    lambda x: (
                         (  # prepend context if flatten
                             _context_map.get(x).fancy
-                            if fancy else _context_map.get(x).value
+                            if fancy
+                            else _context_map.get(x).value
                         )
-                        if flatten else "*"
-                    ) + " " + _fmt.format(**x.json),
-                sorted(
-                    partial_report,
-                    key=lambda x: getattr(x, sort_by),
-                    reverse=sort_by_reverse
+                        if flatten
+                        else "*"
+                    )
+                    + " "
+                    + _fmt.format(**x.json),
+                    (
+                        sorted(
+                            partial_report,
+                            key=lambda x: getattr(x, sort_by),
+                            reverse=sort_by_reverse,
+                        )
+                        if sort_by is not None
+                        else partial_report
+                    ),
                 )
-                if sort_by is not None else partial_report
-            ))
+            )
         return "\n".join(lines)
 
     def __len__(self):

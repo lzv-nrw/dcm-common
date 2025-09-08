@@ -8,7 +8,6 @@ import abc
 
 from dcm_common.logger import Logger
 from dcm_common.models import DataModel, JSONObject
-from dcm_common.models.report import Progress
 from .types import (
     Dependency,
     PythonDependency,

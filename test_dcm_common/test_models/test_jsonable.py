@@ -5,7 +5,10 @@ from collections.abc import MutableMapping
 import pytest
 
 from dcm_common.models.jsonable import (
-    is_jsonable, is_jsonobject, is_jsonable_spec, is_jsonobject_spec
+    is_jsonable,
+    is_jsonobject,
+    is_jsonable_spec,
+    is_jsonobject_spec,
 )
 
 
@@ -23,7 +26,7 @@ from dcm_common.models.jsonable import (
         ([lambda: None], False),
         ({"a": lambda: None}, False),
         ({1: "a"}, False),
-    ]
+    ],
 )
 def test_is_jsonable(json, expectation):
     """Test function `is_jsonable`."""
@@ -44,7 +47,7 @@ def test_is_jsonable(json, expectation):
         ([lambda: None], False),
         ({"a": lambda: None}, False),
         ({1: "a"}, False),
-    ]
+    ],
 )
 def test_is_jsonobject(json, expectation):
     """Test function `is_jsonobject`."""
@@ -62,20 +65,121 @@ def test_is_jsonobject(json, expectation):
         (list["JSONable"], False),
         (MutableMapping[str, "JSONable"], False),
         (type(None) | str | int | float | bool, False),
-        (str | int | float | bool | list["JSONable"] | MutableMapping[str, "JSONable"], False),
-        (type(None) | int | float | bool | list["JSONable"] | MutableMapping[str, "JSONable"], False),
-        (type(None) | str | float | bool | list["JSONable"] | MutableMapping[str, "JSONable"], False),
-        (type(None) | str | int | bool | list["JSONable"] | MutableMapping[str, "JSONable"], False),
-        (type(None) | str | int | float | list["JSONable"] | MutableMapping[str, "JSONable"], False),
-        (type(None) | str | int | float | bool | MutableMapping[str, "JSONable"], False),
+        (
+            str
+            | int
+            | float
+            | bool
+            | list["JSONable"]
+            | MutableMapping[str, "JSONable"],
+            False,
+        ),
+        (
+            type(None)
+            | int
+            | float
+            | bool
+            | list["JSONable"]
+            | MutableMapping[str, "JSONable"],
+            False,
+        ),
+        (
+            type(None)
+            | str
+            | float
+            | bool
+            | list["JSONable"]
+            | MutableMapping[str, "JSONable"],
+            False,
+        ),
+        (
+            type(None)
+            | str
+            | int
+            | bool
+            | list["JSONable"]
+            | MutableMapping[str, "JSONable"],
+            False,
+        ),
+        (
+            type(None)
+            | str
+            | int
+            | float
+            | list["JSONable"]
+            | MutableMapping[str, "JSONable"],
+            False,
+        ),
+        (
+            type(None)
+            | str
+            | int
+            | float
+            | bool
+            | MutableMapping[str, "JSONable"],
+            False,
+        ),
         (type(None) | str | int | float | bool | list["JSONable"], False),
-        (type(None) | str | int | float | bool | list["JSONable"] | MutableMapping[str, "JSONable"], True),
-        (str | int | float | bool | list["JSONable"] | MutableMapping[str, "JSONable"] | type(None), True),
-        (type(None) | str | int | float | bool | list[type(None) | str | int | float | bool | list["JSONable"] | MutableMapping[str, "JSONable"]] | MutableMapping[str, "JSONable"], True),
-        (type(None) | str | int | float | bool | list["JSONable"] | MutableMapping[str, type(None) | str | int | float | bool | list["JSONable"] | MutableMapping[str, "JSONable"]], True),
+        (
+            type(None)
+            | str
+            | int
+            | float
+            | bool
+            | list["JSONable"]
+            | MutableMapping[str, "JSONable"],
+            True,
+        ),
+        (
+            str
+            | int
+            | float
+            | bool
+            | list["JSONable"]
+            | MutableMapping[str, "JSONable"]
+            | type(None),
+            True,
+        ),
+        (
+            type(None)
+            | str
+            | int
+            | float
+            | bool
+            | list[
+                type(None)
+                | str
+                | int
+                | float
+                | bool
+                | list["JSONable"]
+                | MutableMapping[str, "JSONable"]
+            ]
+            | MutableMapping[str, "JSONable"],
+            True,
+        ),
+        (
+            type(None)
+            | str
+            | int
+            | float
+            | bool
+            | list["JSONable"]
+            | MutableMapping[
+                str,
+                type(None)
+                | str
+                | int
+                | float
+                | bool
+                | list["JSONable"]
+                | MutableMapping[str, "JSONable"],
+            ],
+            True,
+        ),
         ("JSONObject", False),
         ("JSONable", True),
-    ]
+    ],
 )
 def test_is_jsonable_spec(spec, expectation):
     """Test function `is_jsonable_spec`."""
@@ -92,10 +196,22 @@ def test_is_jsonable_spec(spec, expectation):
         (bool, False),
         (list["JSONable"], False),
         (MutableMapping[str, "JSONable"], True),
-        (MutableMapping[str, type(None) | str | int | float | bool | list["JSONable"] | MutableMapping[str, "JSONable"]], True),
+        (
+            MutableMapping[
+                str,
+                type(None)
+                | str
+                | int
+                | float
+                | bool
+                | list["JSONable"]
+                | MutableMapping[str, "JSONable"],
+            ],
+            True,
+        ),
         ("JSONObject", True),
         ("JSONable", False),
-    ]
+    ],
 )
 def test_is_jsonobject_spec(spec, expectation):
     """Test function `is_jsonobject_spec`."""

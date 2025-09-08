@@ -1,5 +1,26 @@
 # Changelog
 
+## [4.0.0] - 2025-09-08
+
+### Changed
+
+- **Breaking:** renamed `PostgreSQLAdapterSQL14` to `PostgreSQLAdapter14`
+- refactored `orchestration`-related components to use new `orchestra`-package
+
+### Added
+
+- added initial `orchestra`-package
+
+### Removed
+
+- **Breaking:** removed all legacy support (e.g. postgres-adapter in key-value-store-package)
+- **Breaking:** removed packages `orchestration`, `services.notifications` and related components
+- **Breaking:** moved data models `Token` and `Report` into new `orchestra`-package
+
+### Fixed
+
+- applied auto-formatting
+
 ## [3.28.0] - 2025-08-19
 
 ### Added

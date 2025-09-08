@@ -36,6 +36,7 @@ class KeyValueStore(metaclass=abc.ABCMeta):
       (can be used, for example, when only certain types meet the
       en-/decoding requirements)
     """
+
     @classmethod
     def __subclasshook__(cls, subclass):
         return (
@@ -50,7 +51,7 @@ class KeyValueStore(metaclass=abc.ABCMeta):
             or NotImplemented
         )
 
-    _SUPPORTED_TYPES: tuple[type, ...] = (object, )
+    _SUPPORTED_TYPES: tuple[type, ...] = (object,)
 
     def _encode(self, value: Any) -> Any:
         """

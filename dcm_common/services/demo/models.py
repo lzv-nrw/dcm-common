@@ -5,7 +5,8 @@ Data-model definitions
 from typing import Optional
 from dataclasses import dataclass, field
 
-from dcm_common.models import DataModel, JSONObject, Report as BaseReport
+from dcm_common.models import DataModel, JSONObject
+from dcm_common.orchestra import Report as BaseReport
 from dcm_common.services.plugins import PluginConfig
 
 

@@ -16,6 +16,7 @@ from .interface import KeyValueStore
 @dataclass
 class Record:
     """Record-class storing information related to a database record."""
+
     value: Optional[Any] = None
     file: Optional[Path] = None
 
@@ -54,7 +55,10 @@ class JSONFileStore(KeyValueStore):
         _json = json.loads(data)
         return _json["key"], _json["value"]
 
-    def _cache_record(self, target: str | Path, ) -> None:
+    def _cache_record(
+        self,
+        target: str | Path,
+    ) -> None:
         """
         Caches database-record based on persistent storage.
 
@@ -120,8 +124,7 @@ class JSONFileStore(KeyValueStore):
     def keys(self):
         # iterate storage to cache all records
         for file in list_directory_content(
-            self._dir,
-            condition_function=lambda p: p.is_file()
+            self._dir, condition_function=lambda p: p.is_file()
         ):
             if any(
                 record.file.name == file.name

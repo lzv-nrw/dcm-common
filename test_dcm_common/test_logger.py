@@ -11,11 +11,7 @@ from dcm_common import LoggingContext as Context, Logger, LogMessage
 
 @pytest.fixture(name="contexts")
 def _contexts():
-    return [
-        Context.INFO,
-        Context.WARNING,
-        Context.ERROR
-    ]
+    return [Context.INFO, Context.WARNING, Context.ERROR]
 
 
 @pytest.fixture(name="some_logger")
@@ -59,9 +55,10 @@ def test_logger_log_multiple(some_logger, contexts):
     msg2 = LogMessage("Example2.", "Some other service")
     some_logger.log(
         contexts[0],
-        msg1, msg2,
+        msg1,
+        msg2,
         body=["Example3.", "Example4."],
-        origin="Yet another service"
+        origin="Yet another service",
     )
 
     assert contexts[0] in some_logger
@@ -80,9 +77,11 @@ def test_logger_json(contexts):
 
     # run tests
     get_model_serialization_test(
-        Logger, instances=(
-            logger0, logger1,
-        )
+        Logger,
+        instances=(
+            logger0,
+            logger1,
+        ),
     )()
 
     logger2 = Logger(default_origin="Service0")
@@ -90,11 +89,12 @@ def test_logger_json(contexts):
     logger3 = Logger(fmt="{origin}: {body}")
     logger3.log(contexts[0], body="Example1", origin="Service1")
     # test properties that are not included in the serialization
-    for logger in (logger2, logger3,):
+    for logger in (
+        logger2,
+        logger3,
+    ):
         with pytest.raises(AssertionError):
-            get_model_serialization_test(
-                Logger, instances=(logger,)
-            )()
+            get_model_serialization_test(Logger, instances=(logger,))()
         assert logger.json == Logger.from_json(logger.json).json
 
 
@@ -106,8 +106,8 @@ def test_logger_no_origin(contexts):
     some_logger.log(contexts[0], body="Example1.", origin=some_origin)
     assert some_logger[contexts[0]][0].origin == some_origin
 
-    with pytest.raises(TypeError):
-        some_logger.log(contexts[0], body="Example2.")
+    some_logger.log(contexts[0], body="Example2.")
+    assert some_logger[contexts[0]][1].origin == "unknown"
 
 
 def test_logger_mapping(some_logger, contexts):
@@ -159,35 +159,26 @@ def test_logger_pick(some_logger, contexts):
     some_logger.log(contexts[2], msg3)
 
     # basic
-    another_logger = some_logger.pick(
-        contexts[0]
-    )
+    another_logger = some_logger.pick(contexts[0])
     assert another_logger.default_origin is None
     assert contexts[0] in another_logger
     assert msg1 in another_logger[contexts[0]]
     assert len(another_logger) == 1
 
     # multiple
-    another_logger = some_logger.pick(
-        contexts[0], contexts[1]
-    )
+    another_logger = some_logger.pick(contexts[0], contexts[1])
     assert len(another_logger) == 2
     assert msg1 in another_logger[contexts[0]]
     assert msg2 in another_logger[contexts[1]]
 
     # complement
-    another_logger = some_logger.pick(
-        contexts[1],
-        complement=True
-    )
+    another_logger = some_logger.pick(contexts[1], complement=True)
     assert len(another_logger) == 2
     assert msg1 in another_logger[contexts[0]]
     assert msg3 in another_logger[contexts[2]]
 
     # new default origin
-    another_logger = some_logger.pick(
-        default_origin="New Logger"
-    )
+    another_logger = some_logger.pick(default_origin="New Logger")
     assert another_logger.default_origin == "New Logger"
 
 
@@ -222,8 +213,7 @@ def test_logger_merge_selective(contexts):
     logger_target.merge(logger_src, [contexts[0]])
 
     # check whether copied category1
-    assert \
-        str(logger_target[contexts[0]]) == str(logger_src[contexts[0]])
+    assert str(logger_target[contexts[0]]) == str(logger_src[contexts[0]])
     # check whether copied nothing else
     assert str(logger_target) != str(logger_src)
 
@@ -285,23 +275,21 @@ def test_Logger_fancy_sorted_by_date(
     """
 
     msg_old = LogMessage(
-        "msg 1",
-        "Service 1",
-        datetime=datetime.now() + timedelta(days=-1)
+        "msg 1", "Service 1", datetime=datetime.now() + timedelta(days=-1)
     )
-    msg_new = LogMessage(
-        "msg 2", "Service 2", datetime=datetime.now()
-    )
+    msg_new = LogMessage("msg 2", "Service 2", datetime=datetime.now())
 
     some_logger.log(contexts[0], msg_new)
     some_logger.log(contexts[0], msg_old)
 
-    assert len(re.findall(
-        fr".*({msg_old.body}).*({msg_new.body}).*",
-        some_logger.fancy(
-            sort_by=sort_by, sort_by_reverse=sort_by_reverse
-        ).replace("\n", "")
-    )) == (1 if sort_by is not None and not sort_by_reverse else 0)
+    assert len(
+        re.findall(
+            rf".*({msg_old.body}).*({msg_new.body}).*",
+            some_logger.fancy(
+                sort_by=sort_by, sort_by_reverse=sort_by_reverse
+            ).replace("\n", ""),
+        )
+    ) == (1 if sort_by is not None and not sort_by_reverse else 0)
 
 
 @pytest.mark.parametrize(
@@ -309,9 +297,7 @@ def test_Logger_fancy_sorted_by_date(
     ["origin", None],
     ids=["sorted", "unsorted"],
 )
-def test_Logger_fancy_sorted_by_origin(
-    sort_by, some_logger, contexts
-):
+def test_Logger_fancy_sorted_by_origin(sort_by, some_logger, contexts):
     """
     Test method `fancy` of `Logger` with setting `sort_by`.
     """
@@ -322,10 +308,12 @@ def test_Logger_fancy_sorted_by_origin(
     some_logger.log(contexts[0], msg_z)
     some_logger.log(contexts[0], msg_a)
 
-    assert len(re.findall(
-        fr".*({msg_a.body}).*({msg_z.body}).*",
-        some_logger.fancy(sort_by=sort_by).replace("\n", "")
-    )) == (1 if sort_by is not None else 0)
+    assert len(
+        re.findall(
+            rf".*({msg_a.body}).*({msg_z.body}).*",
+            some_logger.fancy(sort_by=sort_by).replace("\n", ""),
+        )
+    ) == (1 if sort_by is not None else 0)
 
 
 def test_Logger_fancy_flatten(some_logger, contexts):
@@ -344,12 +332,17 @@ def test_Logger_fancy_flatten(some_logger, contexts):
 
     flattened = some_logger.fancy(flatten=True)
     assert len(flattened.split("\n")) == 3
-    assert len(re.findall(
-        fr".*{contexts[0].value}.*({msg_z.body})"
-        + fr".*{contexts[0].value}.*({msg_a.body})"
-        + fr".*{contexts[1].value}.*({msg_a.body}).*",
-        flattened.replace("\n", "")
-    )) == 1
+    assert (
+        len(
+            re.findall(
+                rf".*{contexts[0].value}.*({msg_z.body})"
+                + rf".*{contexts[0].value}.*({msg_a.body})"
+                + rf".*{contexts[1].value}.*({msg_a.body}).*",
+                flattened.replace("\n", ""),
+            )
+        )
+        == 1
+    )
 
 
 def test_Logger_fancy_flatten_with_sorted_by_date(some_logger, contexts):
@@ -370,16 +363,30 @@ def test_Logger_fancy_flatten_with_sorted_by_date(some_logger, contexts):
     some_logger.log(contexts[0], msg_old)
     some_logger.log(contexts[1], msg_current)
 
-    assert len(re.findall(
-        fr".*{contexts[0].value}.*({msg_old.body})"
-        + fr".*{contexts[1].value}.*({msg_current.body})"
-        + fr".*{contexts[0].value}.*({msg_future.body}).*",
-        some_logger.fancy(sort_by="datetime", flatten=True).replace("\n", "")
-    )) == 1
-    assert len(re.findall(
-        fr".*({msg_old.body}).*({msg_current.body}).*({msg_future.body}).*",
-        some_logger.fancy(sort_by="datetime", flatten=False).replace("\n", "")
-    )) == 0
+    assert (
+        len(
+            re.findall(
+                rf".*{contexts[0].value}.*({msg_old.body})"
+                + rf".*{contexts[1].value}.*({msg_current.body})"
+                + rf".*{contexts[0].value}.*({msg_future.body}).*",
+                some_logger.fancy(sort_by="datetime", flatten=True).replace(
+                    "\n", ""
+                ),
+            )
+        )
+        == 1
+    )
+    assert (
+        len(
+            re.findall(
+                rf".*({msg_old.body}).*({msg_current.body}).*({msg_future.body}).*",
+                some_logger.fancy(sort_by="datetime", flatten=False).replace(
+                    "\n", ""
+                ),
+            )
+        )
+        == 0
+    )
 
 
 def test_Logger_fancy_from_json(contexts):
@@ -387,10 +394,7 @@ def test_Logger_fancy_from_json(contexts):
 
     # prepare logger for serialization
     some_logger = Logger(default_origin="Service1")
-    some_logger.log(
-        contexts[0],
-        body="Message1"
-    )
+    some_logger.log(contexts[0], body="Message1")
 
     # make copy from serialized logger
     some_other_logger = Logger(json=some_logger.json)
@@ -407,10 +411,11 @@ def test_LoggingContext_fancy():
 
 
 test_log_message_json = get_model_serialization_test(
-    LogMessage, (
+    LogMessage,
+    (
         ((), {"body": "a", "origin": "b"}),
         ((), {"datetime": datetime.now(), "body": "a", "origin": "b"}),
-    )
+    ),
 )
 
 
@@ -422,15 +427,9 @@ def test_LogMessage_unpacking(contexts):
     msg = LogMessage(body=body, origin=origin)
 
     logger1 = Logger()
-    logger1.log(
-        contexts[0],
-        **msg
-    )
+    logger1.log(contexts[0], **msg)
     logger2 = Logger()
-    logger2.log(
-        contexts[0],
-        body=body, origin=origin
-    )
+    logger2.log(contexts[0], body=body, origin=origin)
 
     assert str(logger1) == str(logger2)
 

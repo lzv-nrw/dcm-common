@@ -192,7 +192,9 @@ class Connection(metaclass=abc.ABCMeta):
         if not self._claim:
             raise ConnectionError("Tried to release an unclaimed connection.")
         if not self._claim.validate(claim):
-            raise ConnectionError("Tried to release a connection with bad claim.")
+            raise ConnectionError(
+                "Tried to release a connection with bad claim."
+            )
         self._destroy_claim(claim)
         self._claim = None
         self._unclaimed.set()

@@ -216,25 +216,6 @@ paths:
         - demo
       parameters:
         - $ref: '#/components/parameters/Token'
-        - name: broadcast
-          in: query
-          description:
-            whether this request should be broadcasted
-            (only relevant in parallel deployment and only if message
-            broadcasting is configured)
-          schema:
-            type: boolean
-            default: true
-          required: false
-        - name: re-queue
-          in: query
-          description:
-            whether the associated token should be added to the queue
-            again
-          schema:
-            type: boolean
-            default: false
-          required: false
       requestBody:
         required: true
         content:
@@ -268,7 +249,7 @@ paths:
               schema:
                 type: string
                 example:
-                  "notification service unavailable"
+                  "controller unavailable"
 components:
   schemas:
     Status:
@@ -680,108 +661,67 @@ components:
                   type: string
                   description: mount point of shared file system
                   example: /file_storage
-                orchestration:
+                orchestra:
                   type: object
-                  description: orchestration-related settings
+                  description: orchestra-related settings
                   properties:
-                    # FIXME: this should be added before in API-projects
-                    # processes:
-                    #   type: integer
-                    #   description: maximum number of simultaneous job processes
-                    #   example: 1
-                    at_startup:
+                    atStartup:
                       type: boolean
                       description:
                         whether orchestration-processing loop is run at startup
                       example: true
-                    queue:
-                      $ref: '#/components/schemas/DBAdapter'
-                    registry:
-                      $ref: '#/components/schemas/DBAdapter'
-                    token:
+                    poolSize:
+                      type: integer
+                      description: number of worker-threads
+                      example: 1
+                    daemonInterval:
+                      type: number
+                      description: interval of orchestra-restarts in seconds
+                      example: 1
+                    controller:
                       type: object
-                      description: orchestration token-related settings
+                      description: controller settings
                       properties:
-                        expiration:
-                          type: boolean
-                          description: whether job tokens (and their
-                            associated info like report) expire
-                          example: true
-                        duration:
-                          type: integer
-                          description:
-                            time until job token expires in seconds
-                          example: 3600
-                      required:
-                        - expiration
-                        - duration
-                    debug:
-                      type: boolean
-                      description: whether to have orchestrator print
-                        debug-information
-                      example: true
-                    controls_api:
-                      type: boolean
-                      description: whether the orchestration-controls
-                        API is available
-                      example: true
-                    abort:
-                      type: object
-                      description: |-
-                        abort-related settings
-
-                        only relevant in parallel deployment
-                      properties:
-                        subscription:
-                          type: boolean
-                          description:
-                            whether a subscription to the abort-notifications
-                            is made
-                          example: true
-                        url:
+                        type:
                           type: string
-                          description: url of the notification service
-                          example: https://www.lzv.nrw/abort-notifications
-                        timeout:
+                          description: controller type
+                          example: sqlite
+                        args:
                           type: object
-                          description: timeout-related settings
-                          properties:
-                            duration:
-                              type: number
-                              description: timeout duration
-                              example: 1.0
-                          required:
-                            - duration
-                        callback:
-                          type: string
-                          description: |-
-                            url for abort-callbacks
-
-                            if omitted, the subscriber's request address
-                            is used (as determined by the notification
-                            service)
-                          example: https://www.lzv.nrw/demo
+                          description: controller arguments
+                          additionalProperties: true
+                          example:
+                            lock_ttl: 30
                       required:
-                        - subscription
-                    daemon_interval:
+                        - type
+                        - args
+                    worker:
+                      type: object
+                      description: worker settings
+                      properties:
+                        args:
+                          type: object
+                          description: controller arguments
+                          additionalProperties: true
+                          example:
+                            lock_refresh_interval: 10
+                        interval:
+                          type: number
+                          description: interval of the worker loop in seconds
+                          example: 1
+                      required:
+                        - args
+                        - interval
+                    abortTimeout:
                       type: number
-                      description:
-                        interval of orchestrator-restarts (after crash) in
-                        seconds
-                      example: 1
-                    orchestrator_interval:
-                      type: number
-                      description: time in seconds between each iteration
-                        of the orchestrator's processing loop
-                      example: 1
+                      description: duration for a timeout in an abort-request
                   required:
-                    - at_startup
-                    - queue
-                    - registry
-                    - token
-                    - debug
-                    - controls_api
-                    - abort
+                    - atStartup
+                    - poolSize
+                    - daemonInterval
+                    - controller
+                    - worker
+                    - abortTimeout
                 database:
                   type: object
                   description:
@@ -852,7 +792,7 @@ components:
                           example: pass
               required:
                 - allow_cors
-                - orchestration
+                - orchestra
                 - database
             plugins:
               type: object

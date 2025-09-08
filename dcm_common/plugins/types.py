@@ -59,9 +59,7 @@ class _Dependencies:
         """
         Returns serialized dependencies as {<name>: <version>, ...}.
         """
-        return {
-            package.name: package.version for package in self.dependencies
-        }
+        return {package.name: package.version for package in self.dependencies}
 
 
 class JSONType:
@@ -284,7 +282,7 @@ class Argument:
                         return (
                             False,
                             f"Bad value '{value}' in array at position "
-                            + f"{index}: {response[1]}"
+                            + f"{index}: {response[1]}",
                         )
 
         # validate properties if necessary
@@ -375,6 +373,7 @@ class PluginExecutionContext:
     _push -- function that is called by `plugin.get` after progress has
              been made
     """
+
     result: PluginResult = field(default_factory=PluginResult)
     _set_progress: Callable[[str], None] = lambda value: None
     _push: Callable[[], None] = lambda: None

@@ -30,19 +30,17 @@ class HTTPKeyValueStoreAdapter(KeyValueStoreAdapter):
         self,
         url: str,
         timeout: float = 1.0,
-        proxies: Optional[Mapping[str, str]] = None
+        proxies: Optional[Mapping[str, str]] = None,
     ) -> None:
         self._url = url
         self._timeout = timeout
         self._proxies = proxies
-        self._default_kwargs = {
-            "timeout": timeout, "proxies": proxies
-        }
+        self._default_kwargs = {"timeout": timeout, "proxies": proxies}
 
     def read(self, key, pop=False):
         response = requests.get(
             f"{self._url}/db/{key}{'?pop=' if pop else ''}",
-            **self._default_kwargs
+            **self._default_kwargs,
         )
         if response.status_code == 200:
             return response.json()
@@ -59,23 +57,23 @@ class HTTPKeyValueStoreAdapter(KeyValueStoreAdapter):
 
     def write(self, key, value):
         requests.post(
-            f"{self._url}/db/{key}", data=dumps(value), **self._default_kwargs,
-            headers={"Content-Type": "application/json"}
+            f"{self._url}/db/{key}",
+            data=dumps(value),
+            **self._default_kwargs,
+            headers={"Content-Type": "application/json"},
         )
 
     def push(self, value):
         return requests.post(
-            f"{self._url}/db", data=dumps(value), **self._default_kwargs,
-            headers={"Content-Type": "application/json"}
+            f"{self._url}/db",
+            data=dumps(value),
+            **self._default_kwargs,
+            headers={"Content-Type": "application/json"},
         ).text
 
     def delete(self, key):
-        requests.delete(
-            f"{self._url}/db/{key}", **self._default_kwargs
-        )
+        requests.delete(f"{self._url}/db/{key}", **self._default_kwargs)
 
     def keys(self):
-        response = requests.options(
-            f"{self._url}/db", **self._default_kwargs
-        )
+        response = requests.options(f"{self._url}/db", **self._default_kwargs)
         return tuple(response.json())

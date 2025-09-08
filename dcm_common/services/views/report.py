@@ -6,11 +6,10 @@ web-services.
 from flask import Blueprint, Response, jsonify
 from data_plumber_http.decorators import flask_handler, flask_args
 
-from dcm_common.orchestration import ScalableOrchestrator
-from dcm_common.services.config import BaseConfig
+from dcm_common.services.config import OrchestratedAppConfig
 from dcm_common.services.handlers import report_handler
 from dcm_common.models import JSONObject
-from dcm_common.models.report import Status
+from dcm_common.orchestra.models import Status
 from .interface import View
 
 
@@ -22,11 +21,8 @@ class ReportView(View):
 
     NAME = "report"
 
-    def __init__(
-        self, config: BaseConfig, orchestrator: ScalableOrchestrator
-    ) -> None:
+    def __init__(self, config: OrchestratedAppConfig) -> None:
         View.__init__(self, config)
-        self.orchestrator = orchestrator
 
     def _get_status_code(self, info: JSONObject) -> int:
         if any(
@@ -38,41 +34,37 @@ class ReportView(View):
 
     def configure_bp(self, bp: Blueprint, *args, **kwargs):
         @bp.route("/report", methods=["GET"])
-        @flask_handler(
-            handler=report_handler,
-            json=flask_args
-        )
+        @flask_handler(handler=report_handler, json=flask_args)
         def get_report(token: str):
             """Get report by job_token."""
 
-            info = self.orchestrator.get_info(token)
-            if info is None:
+            try:
+                info = self.config.controller.get_info(token)
+            except ValueError:
                 return Response(
                     f"Unknown job-token '{token}'.",
                     status=404,
-                    mimetype="text/plain"
+                    mimetype="text/plain",
                 )
 
             # return results
             return jsonify(info.get("report", {})), self._get_status_code(info)
 
         @bp.route("/progress", methods=["GET"])
-        @flask_handler(
-            handler=report_handler,
-            json=flask_args
-        )
+        @flask_handler(handler=report_handler, json=flask_args)
         def get_progress(token: str):
             """Get progress by job_token."""
-            info = self.orchestrator.get_info(token)
-            if info is None:
+            try:
+                info = self.config.controller.get_info(token)
+            except ValueError:
                 return Response(
                     f"Unknown job-token '{token}'.",
                     status=404,
-                    mimetype="text/plain"
+                    mimetype="text/plain",
                 )
 
             # return the progress of the report
             return (
                 jsonify(info.get("report", {}).get("progress", {})),
-                self._get_status_code(info)
+                self._get_status_code(info),
             )

@@ -69,11 +69,13 @@ def db_loader(
         thread.start()
 
     # perform clean shutdown on exit
-    def _exit():
+    def _exit(*args, **kwargs):
         """Terminate connections."""
         abort.set()
         if db.pool.is_open:
             db.pool.close()
+
+    result.stop = _exit
 
     add_signal_handler(signal.SIGINT, _exit)
     add_signal_handler(signal.SIGTERM, _exit)

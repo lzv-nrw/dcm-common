@@ -7,15 +7,6 @@ from flask import Flask
 from .common import ExtensionLoaderResult
 
 
-# FIXME: drop legacy support
-def cors(app: Flask, kwargs=None) -> ExtensionLoaderResult:
-    """
-    Register the `Flask-CORS` extension with the given `kwargs` if
-    possible (i.e. if the package is installed).
-    """
-    return cors_loader(app, kwargs).data
-
-
 def cors_loader(app: Flask, kwargs=None) -> ExtensionLoaderResult:
     """
     Register the `Flask-CORS` extension with the given `kwargs` if

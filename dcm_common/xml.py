@@ -43,8 +43,9 @@ class XMLValidator:
     _ERROR_FORMAT = (
         "{reason} ({name}: {message}; XPath: {xpath}; XSD: {xsd}; XML: {xml})."
     )
-    _INFO_FORMAT = \
+    _INFO_FORMAT = (
         "Validation of '{xml}' with schema '{schema}' returns {result}."
+    )
 
     def __init__(
         self,
@@ -96,9 +97,7 @@ class XMLValidator:
         * beginning and ending whitespace is removed (per line), and
         * newlines have been removed.
         """
-        return "".join(
-            x.strip() for x in string.split("\n")
-        )
+        return "".join(x.strip() for x in string.split("\n"))
 
     def is_valid(self, xml: XML) -> bool:
         """
@@ -137,21 +136,26 @@ class XMLValidator:
                         name=type(error).__name__,
                         message=error.message,
                         xpath=error.path if error.path is not None else "-",
-                        xsd=self._flatten_multiline(
-                            error.validator.tostring("", 20)
-                        ) if hasattr(error.validator, "tostring") else "-",
+                        xsd=(
+                            self._flatten_multiline(
+                                error.validator.tostring("", 20)
+                            )
+                            if hasattr(error.validator, "tostring")
+                            else "-"
+                        ),
                         xml=(
                             self._flatten_multiline(
                                 tostring(error.obj).decode()
-                            ) if isinstance(error.obj, (Element))
+                            )
+                            if isinstance(error.obj, (Element))
                             else str(error.obj)
-                        )
-                    )
+                        ),
+                    ),
                 )
         except ParseError as exc_info:
             log.log(
                 Context.ERROR,
-                body=f"Malformed XML, unable to continue ({exc_info})."
+                body=f"Malformed XML, unable to continue ({exc_info}).",
             )
             return XMLValidatorResult(success=False, log=log)
         log.log(

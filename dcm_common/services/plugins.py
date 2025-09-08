@@ -2,18 +2,9 @@
 
 from typing import Optional, Mapping, Any
 from dataclasses import dataclass
-from importlib.metadata import version
 
-if version("data_plumber_http").startswith("1."):
-    from data_plumber_http.settings import Responses
-    from data_plumber_http import DPType
-
-    DPV1 = True
-else:  # TODO remove legacy-support
-    DPType = object
-    Responses = object
-    DPV1 = False
-
+from data_plumber_http.settings import Responses
+from data_plumber_http import DPType
 
 from dcm_common.util import qjoin
 from dcm_common.models import DataModel
@@ -52,10 +43,6 @@ class PluginType(DPType):
         acceptable_plugins: Mapping[str, PluginInterface],
         acceptable_context: Optional[list[str]] = None,
     ):
-        if not DPV1:  # TODO remove legacy-support
-            raise NotImplementedError(
-                "'PluginType' is only available for data-plumber-http v1."
-            )
         self.acceptable_plugins = acceptable_plugins
         self.acceptable_context = acceptable_context
 

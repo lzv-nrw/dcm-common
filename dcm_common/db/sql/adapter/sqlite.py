@@ -30,6 +30,7 @@ class SQLiteConnection(Connection):
     Implementation of a SQLite-connection based on the `sqlite3`-
     package.
     """
+
     def __init__(self, *args, db_file: Optional[str | Path] = None, **kwargs):
         self._db_file = ":memory:" if db_file is None else str(db_file)
         super().__init__(*args, **kwargs)
@@ -195,14 +196,14 @@ class SQLiteAdapter3(PooledConnectionAdapter, SQLAdapter):
     @lru_cache(maxsize=_DB_ADAPTER_SCHEMA_CACHE_SIZE)
     def _get_column_types(self, table: str) -> TransactionResult:
         raw = self.execute(
-            _Statement(
-                f"SELECT name, type FROM PRAGMA_TABLE_INFO('{table}')"
-            ),
+            _Statement(f"SELECT name, type FROM PRAGMA_TABLE_INFO('{table}')"),
             clear_schema_cache=False,
         )
         if len(raw.data) == 0:
             return TransactionResult(
-                False, msg=f"Table '{table}' does not exist.", raw=raw,
+                False,
+                msg=f"Table '{table}' does not exist.",
+                raw=raw,
             )
         return self.build_response(
             raw,
@@ -214,20 +215,18 @@ class SQLiteAdapter3(PooledConnectionAdapter, SQLAdapter):
     @lru_cache(maxsize=_DB_ADAPTER_SCHEMA_CACHE_SIZE)
     def _get_column_names(self, table: str) -> TransactionResult:
         raw = self.execute(
-            _Statement(
-                f"SELECT name FROM PRAGMA_TABLE_INFO('{table}')"
-            ),
+            _Statement(f"SELECT name FROM PRAGMA_TABLE_INFO('{table}')"),
             clear_schema_cache=False,
         )
         if len(raw.data) == 0:
             return TransactionResult(
-                False, msg=f"Table '{table}' does not exist.", raw=raw,
+                False,
+                msg=f"Table '{table}' does not exist.",
+                raw=raw,
             )
         return self.build_response(
             raw,
-            post_process=lambda r: [
-                colinfo[0] for colinfo in r.data
-            ],
+            post_process=lambda r: [colinfo[0] for colinfo in r.data],
         )
 
     @lru_cache(maxsize=_DB_ADAPTER_SCHEMA_CACHE_SIZE)
@@ -248,9 +247,7 @@ class SQLiteAdapter3(PooledConnectionAdapter, SQLAdapter):
                 msg=f"Table '{table}' does not exist or has no primary key.",
                 raw=raw,
             )
-        return self.build_response(
-            raw, post_process=lambda x: x.data[0][0]
-        )
+        return self.build_response(raw, post_process=lambda x: x.data[0][0])
 
     def clear_schema_cache(self):
         # omit clearing cache for _build_base as it does not change

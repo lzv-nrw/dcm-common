@@ -4,12 +4,19 @@ Demo View-class definition
 
 from typing import Optional
 from time import sleep
+from uuid import uuid4
 
-from flask import Blueprint, jsonify, Response
+from flask import Blueprint, jsonify, Response, request
 from data_plumber_http.decorators import flask_handler, flask_args, flask_json
 from dcm_common import LoggingContext as Context
 from dcm_common.plugins.demo import DemoPlugin
-from dcm_common.orchestration import JobConfig, Job, Children
+from dcm_common.orchestra.models import (
+    JobConfig,
+    JobInfo,
+    JobContext,
+    AbortContext,
+    ChildJob,
+)
 from dcm_common import services
 
 from .config import AppConfig
@@ -39,6 +46,9 @@ class DemoAdapter(services.ServiceAdapter):
     def _get_api_endpoint(self):
         return self._api_client.demo
 
+    def _get_abort_endpoint(self):
+        return self._api_client.abort
+
     def _build_request_body(self, base_request_body, target):
         return base_request_body
 
@@ -53,6 +63,9 @@ class DemoView(services.OrchestratedView):
 
     def __init__(self, config: AppConfig, *args, **kwargs) -> None:
         super().__init__(config, *args, **kwargs)
+
+    def register_job_types(self):
+        self.config.worker_pool.register_job_type("demo", self.demo, Report)
 
     def configure_bp(self, bp: Blueprint, *args, **kwargs) -> None:
 
@@ -72,154 +85,137 @@ class DemoView(services.OrchestratedView):
         ):
             """Submit job."""
             try:
-                token = self.orchestrator.submit(
-                    JobConfig(
-                        request_body={
-                            "demo": demo.json,
-                            "callback_url": callback_url,
-                        },
-                        context=self.NAME,
+                token = self.config.controller.queue_push(
+                    token or str(uuid4()),
+                    JobInfo(
+                        JobConfig(
+                            "demo",
+                            original_body=request.json,
+                            request_body={
+                                "demo": demo.json,
+                                "callback_url": callback_url,
+                            },
+                        ),
+                        report=Report(
+                            host=request.host_url, args=request.json
+                        ),
                     ),
-                    token=token,
                 )
-            except ValueError as exc_info:
+            # pylint: disable=broad-exception-caught
+            except Exception as exc_info:
                 return Response(
                     f"Submission rejected: {exc_info}",
                     mimetype="text/plain",
-                    status=400,
+                    status=500,
                 )
             return jsonify(token.json), 201
 
         self._register_abort_job(bp, "/demo")
 
-    def get_job(self, config: JobConfig) -> Job:
-        return Job(
-            cmd=lambda push, data, children: self.demo(
-                push,
-                data,
-                children,
-                DemoConfig.from_json(config.request_body["demo"]),
-            ),
-            hooks={
-                "startup": services.default_startup_hook,
-                "success": services.default_success_hook,
-                "fail": services.default_fail_hook,
-                "abort": services.default_abort_hook,
-                "completion": services.termination_callback_hook_factory(
-                    config.request_body.get("callback_url", None),
-                ),
-            },
-            name="Demo Service",
-        )
-
-    def demo(
-        self,
-        push,
-        report: Report,
-        children: Children,
-        demo_config: DemoConfig,
-    ):
-        """
-        Job instructions for the '/demo' endpoint.
-
-        Orchestration standard-arguments:
-        push -- (orchestration-standard) push `report` to host process
-        report -- (orchestration-standard) common report-object shared
-                  via `push`
-        children -- (orchestration-standard) `ChildJob`-registry shared
-                    via `push`
-
-        Keyword arguments:
-        demo_config -- a `DemoConfig`-config
-        """
+    def demo(self, context: JobContext, info: JobInfo):
+        """Job instructions for the '/demo' endpoint."""
+        demo_config = DemoConfig.from_json(info.config.request_body["demo"])
+        info.report.log.set_default_origin("Demo-Service")
 
         # set progress info
-        report.progress.verbose = "preparing.."
-        push()
+        info.report.progress.verbose = "preparing.."
+        context.push()
         sleep(0.5 * demo_config.duration)
 
         if demo_config.success_plugin is not None:
-            report.progress.verbose = (
+            info.report.progress.verbose = (
                 f"calling plugin '{demo_config.success_plugin.plugin}' .."
             )
-            report.log.log(
+            info.report.log.log(
                 context=Context.INFO,
                 body=f"Running plugin '{demo_config.success_plugin.plugin}'.",
             )
-            push()
+            context.push()
             plugin: DemoPlugin = self.config.AVAILABLE_PLUGINS[
                 demo_config.success_plugin.plugin
             ]
             context = plugin.create_context(
-                report.progress.create_verbose_update_callback(
+                info.report.progress.create_verbose_update_callback(
                     plugin.display_name
                 ),
-                push,
+                context.push,
             )
             result = plugin.get(
                 context, **plugin.hydrate(demo_config.success_plugin.args)
             )
-            report.log.merge(result.log.pick(Context.ERROR))
-            push()
+            info.report.log.merge(result.log.pick(Context.ERROR))
+            context.push()
             success = [result.success]
         else:
             success = [demo_config.success]
+
         for i, child in enumerate(demo_config.children or []):
-            if report.children is None:
-                report.children = {}
-            child_id = f"child-{i}@demo"
+            if info.report.children is None:
+                info.report.children = {}
+            child_name = f"child-{i}@demo"
             # write log
-            report.progress.verbose = (
-                f"making request to '{child.host}' (id '{child_id}').."
+            info.report.progress.verbose = (
+                f"making request to '{child.host}' (name '{child_name}').."
             )
-            report.log.log(
+            info.report.log.log(
                 context=Context.INFO,
-                body=f"Making request to '{child.host}' (id '{child_id}').",
+                body=f"Making request to '{child.host}' (name '{child_name}').",
             )
-            push()
-            # initialize adapter, allocate and link child-report, make call
-            report.children[child_id] = {}
+            context.push()
             adapter = DemoAdapter(child.host, 0.01, child.timeout)
-            adapter.run(
-                child.body,
-                None,
-                info := services.APIResult(report=report.children[child_id]),
-                post_submission_hooks=(
-                    # link to children
-                    children.link_ex(
-                        url=child.host,
-                        abort_path="/demo",
-                        tag=f"demo-child-{i}",
-                        child_id=child_id,
-                        post_link_hook=push,
+            info.report.children[child_name] = {}
+            child_token = str(uuid4())
+            # add to children
+            context.add_child(
+                ChildJob(
+                    child_token,
+                    child_name,
+                    adapter.get_abort_callback(
+                        child_token, child_name, "Demo-Service"
                     ),
+                )
+            )
+            context.push()
+            adapter.run(
+                child.body | {"token": child_token},
+                None,
+                child_info := services.APIResult(
+                    report=info.report.children[child_name]
+                ),
+                update_hooks=(lambda data: context.push(),),
+                post_submission_hooks=(
                     # post to log
-                    lambda token: (
-                        report.log.log(
+                    lambda token, info=info: (
+                        info.report.log.log(
                             Context.INFO,
                             body=f"Got token '{token}' from external service.",
                         ),
-                        push(),
+                        context.push(),
                     ),
                 ),
-                update_hooks=(lambda data: push(),),
             )
-            children.remove(f"demo-child-{i}")
+            context.remove_child(child_token)
             # collect results
-            success.append(adapter.success(info))
+            success.append(adapter.success(child_info))
             if not success[-1]:
-                report.log.log(
+                info.report.log.log(
                     context=Context.ERROR,
                     body=(
                         f"Request to '{child.host}' returned with an error. "
-                        + f"See child-report '{child_id}' for details."
+                        + f"See child-report '{child_name}' for details."
                     ),
                 )
-            push()
+            context.push()
 
-        report.progress.verbose = "evaluating.."
-        push()
+        info.report.progress.verbose = "evaluating.."
+        context.push()
         sleep(0.5 * demo_config.duration)
 
-        report.data.success = all(success)
-        push()
+        info.report.data.success = all(success)
+        context.push()
+
+        # make callback; rely on _run_callback to push progress-update
+        info.report.progress.complete()
+        self._run_callback(
+            context, info, info.config.request_body.get("callback_url")
+        )

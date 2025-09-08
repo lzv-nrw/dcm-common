@@ -7,7 +7,9 @@ import pytest
 
 from dcm_common.services.tests.fixtures import run_service, external_service
 from dcm_common.db import (
-    KeyValueStoreAdapter, HTTPKeyValueStoreAdapter, MemoryStore,
+    KeyValueStoreAdapter,
+    HTTPKeyValueStoreAdapter,
+    MemoryStore,
     key_value_store_app_factory,
 )
 
@@ -124,4 +126,4 @@ def test_keys(db: HTTPKeyValueStoreAdapter, db_app):
     """Test method `keys` of class `HTTPKeyValueStoreAdapter`."""
     assert db.keys() == ()
     db.write("key", "value")
-    assert db.keys() == ("key", )
+    assert db.keys() == ("key",)

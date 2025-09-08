@@ -8,11 +8,6 @@ from .key_value_store.middleware.flask.factory import (
 from .key_value_store.adapter.interface import KeyValueStoreAdapter
 from .key_value_store.adapter.native import NativeKeyValueStoreAdapter
 from .key_value_store.adapter.http import HTTPKeyValueStoreAdapter
-from .key_value_store.adapter.postgres import PostgreSQLAdapter14
-
-
-# FIXME fix naming conflict for PostgreSQLAdapter14 in key_value_store and
-# sqlimport subprocess
 
 
 def check_psycopg_dependencies():
@@ -39,13 +34,11 @@ def check_psycopg_dependencies():
 if (psycopg_ok := check_psycopg_dependencies())[0]:
     import psycopg
 
-    from .sql.adapter.postgres import (
-        PostgreSQLAdapter14 as PostgreSQLAdapterSQL14,
-    )
+    from .sql.adapter.postgres import PostgreSQLAdapter14
 else:
     psycopg = None
 
-    class PostgreSQLAdapterSQL14:
+    class PostgreSQLAdapter14:
         def __init__(self, *args, **kwargs):
             raise RuntimeError("Unable to import 'psycopg'" + psycopg_ok[1])
 
@@ -74,9 +67,8 @@ __all__ = [
     "KeyValueStoreAdapter",
     "NativeKeyValueStoreAdapter",
     "HTTPKeyValueStoreAdapter",
-    "PostgreSQLAdapter14",
     "psycopg",
-    "PostgreSQLAdapterSQL14",
+    "PostgreSQLAdapter14",
     "SQLiteAdapter3",
     "RawTransactionResult",
     "TransactionResult",

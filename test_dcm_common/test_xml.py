@@ -35,9 +35,7 @@ def _minimal_xml():
 
 def test_xmlvalidator_constructor(minimal_xsd):
     """Test the `version` argument of the `XMLValidator constructor."""
-    assert isinstance(
-        XMLValidator(minimal_xsd).schema, xmlschema.XMLSchema10
-    )
+    assert isinstance(XMLValidator(minimal_xsd).schema, xmlschema.XMLSchema10)
     assert isinstance(
         XMLValidator(minimal_xsd, "1.0").schema, xmlschema.XMLSchema10
     )
@@ -55,7 +53,7 @@ def test_xmlvalidator_constructor(minimal_xsd):
         (lambda x: x.replace("<name>", "<nme>"), False),
         (lambda x: x.replace("age", "height"), False),
     ],
-    ids=["ok", "bad-xml", "invalid-xml"]
+    ids=["ok", "bad-xml", "invalid-xml"],
 )
 def test_is_valid(mutate, expected_result, minimal_xsd, minimal_xml):
     """Test method `is_valid` of `XMLValidator`."""
@@ -72,17 +70,19 @@ def test_is_valid(mutate, expected_result, minimal_xsd, minimal_xml):
         (lambda x: x.replace("age", "height"), True, 1),  # invalid-xml-single
         (
             # invalid-xml-multiple
-            lambda x:
-                x.replace("age", "height").replace("</name>", "</name>\n  <sex>male</sex>"),
+            lambda x: x.replace("age", "height").replace(
+                "</name>", "</name>\n  <sex>male</sex>"
+            ),
             True,
-            2
+            2,
         ),
         (
             # invalid-xml-attribute
-            lambda x:
-                x.replace("<age>30</age>", """<age key="string">30</age>"""),
+            lambda x: x.replace(
+                "<age>30</age>", """<age key="string">30</age>"""
+            ),
             True,
-            1
+            1,
         ),
     ],
     ids=[
@@ -91,7 +91,7 @@ def test_is_valid(mutate, expected_result, minimal_xsd, minimal_xml):
         "invalid-xml-single",
         "invalid-xml-multiple",
         "invalid-xml-attribute",
-        ]
+    ],
 )
 def test_validate(
     mutate, expected_success, expected_errors, minimal_xsd, minimal_xml
@@ -133,7 +133,7 @@ def test_schema_sources_validate(
     elif source == "url":
         run_service(
             routes=[("/minimal.xsd", lambda: (minimal_xsd, 200), ["GET"])],
-            port=5555
+            port=5555,
         )
         validator = XMLValidator("http://localhost:5555/minimal.xsd")
     else:  # string

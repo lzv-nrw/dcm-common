@@ -4,22 +4,14 @@ View-class interface definition
 
 from typing import Optional, Mapping, Callable
 import abc
+from time import time, sleep
 
-from flask import Blueprint, request, Response
+import requests
+from flask import Blueprint, Response
 from data_plumber_http.decorators import flask_handler, flask_args, flask_json
 
-from dcm_common.models import Report
-from dcm_common.orchestration import (
-    JobConfig, Job, ScalableOrchestrator
-)
-from dcm_common.db import KeyValueStoreAdapter
-from dcm_common.services.config import (
-    BaseConfig, OrchestratedAppConfig
-)
-from dcm_common import services
-from dcm_common.services.hooks import (
-    pre_queue_hook_factory, pre_exec_hook_factory
-)
+from dcm_common import services, LoggingContext
+from dcm_common.services.config import BaseConfig
 
 
 class View(metaclass=abc.ABCMeta):
@@ -30,6 +22,7 @@ class View(metaclass=abc.ABCMeta):
     Keyword arguments:
     config -- `BaseConfig`-object
     """
+
     NAME = "undefined"
 
     def __init__(
@@ -50,8 +43,10 @@ class View(metaclass=abc.ABCMeta):
 
     def get_blueprint(
         self,
-        *args, name: Optional[str] = None, import_name: Optional[str] = None,
-        **kwargs
+        *args,
+        name: Optional[str] = None,
+        import_name: Optional[str] = None,
+        **kwargs,
     ) -> Blueprint:
         """
         Returns `Blueprint` instance. All positional and keyword args
@@ -63,102 +58,52 @@ class View(metaclass=abc.ABCMeta):
         import_name -- `Blueprint`'s import-name
                        (default None; uses `__name__`)
         """
-        bp = Blueprint(
-            name or self.NAME,
-            import_name or __name__
-        )
+        bp = Blueprint(name or self.NAME, import_name or __name__)
         self.configure_bp(bp, *args, **kwargs)
         return bp
 
 
-class JobFactory(metaclass=abc.ABCMeta):
+class OrchestratedView(View, metaclass=abc.ABCMeta):
     """
-    Interface for the definition of a job factory class and its
-    related components.
+    Interface for `View`s that utilized the orchestra-subpackage. An
+    implementation requires a definition of the `register_job_type`-
+    method which should register all view-related job types with the
+    `WorkerPool`. It is expected to be used in conjunction with an
+    `OrchestratedAppConfig`.
     """
-    def get_job(self, config: JobConfig) -> Job:
-        """
-        Returns a `Job` based on `config`.
 
-        Keyword arguments:
-        config -- configuration details for this job
-        """
+    # pylint: disable=abstract-method
+
+    @abc.abstractmethod
+    def register_job_types(self) -> None:
+        """Register all view-related job types with the `WorkerPool`."""
         raise NotImplementedError(
             f"Class {self.__class__.__name__} does not define method "
-            + "'get_job'."
+            + "'register_job_types'."
         )
 
-
-class OrchestratedView(View, JobFactory):  # pylint: disable=abstract-method
-    """
-    An `OrchestratedView` combines `View` and `JobFactory` to bundle up
-    all view-related information. The constructor creates a pre-
-    configured `ScalableOrchestrator` that is exposed as
-    `OrchestratedView.orchestrator`.
-
-    Alternatively, an existing `ScalableOrchestrator` can be passed into
-    the constructor. In this orchestrator the `OrchestratedView.get_job`
-    is registered as factory under `context`. Similarly, the default
-    hooks are registered using that `context`.
-
-    Keyword arguments:
-    config -- `OrchestratedAppConfig`-object
-    orchestrator -- `ScalableOrchestrator`-object
-                    (default None; uses the following args to initialize
-                    default orchestrator)
-    context -- only relevant when passing `orchestrator`; used to
-               register associated job-factory and default hooks
-               (default None)
-    report_type -- `Report`-class used to initialize `JobInfo`-objects
-                   in the orchestrator
-                   (default None; uses dcm-common.models base-report
-                   type)
-    queue -- override for queue-adapter
-             (default None; uses `config`'s value)
-    registry -- override for registry-adapter
-                (default None; uses `config`'s value)
-    """
-    def __init__(
-        self,
-        config: OrchestratedAppConfig,
-        orchestrator: Optional[ScalableOrchestrator] = None,
-        context: Optional[str] = None,
-        report_type: Optional[type[Report]] = None,
-        queue: Optional[KeyValueStoreAdapter] = None,
-        registry: Optional[KeyValueStoreAdapter] = None,
-    ) -> None:
-        View.__init__(self, config)
-        JobFactory.__init__(self)
-        if orchestrator:
-            self.orchestrator = orchestrator
-            self.orchestrator.register_factory(context, self.get_job)
-            self.orchestrator.register_queue_hooks(
-                context, {
-                    "pre-queue":
-                        pre_queue_hook_factory(report_type or Report)
-                }
+    def _run_callback(self, context, info, callback_url):
+        if callback_url is not None:
+            # make callback
+            response = requests.post(
+                callback_url, json=info.token.json, timeout=10
             )
-            self.orchestrator.register_exec_hooks(
-                context, {
-                    "pre-execution":
-                        pre_exec_hook_factory(report_type or Report)
-                }
-            )
-        else:
-            self.orchestrator = ScalableOrchestrator(
-                self.get_job,
-                queue or config.queue,
-                registry or config.registry,
-                queue_hooks={
-                    "pre-queue":
-                        pre_queue_hook_factory(report_type or Report)
-                },
-                exec_hooks={
-                    "pre-execution":
-                        pre_exec_hook_factory(report_type or Report)
-                },
-                _debug=config.ORCHESTRATION_DEBUG
-            )
+
+            # if unexpected response code, write to log
+            if response.status_code == 200:
+                info.report.log.log(
+                    LoggingContext.ERROR,
+                    body=f"Made callback to '{callback_url}'.",
+                )
+            else:
+                info.report.log.log(
+                    LoggingContext.ERROR,
+                    body=(
+                        f"Failed callback to '{callback_url}'. Expected "
+                        + f"status '200' but got '{response.status_code}'."
+                    ),
+                )
+            context.push()
 
     def _register_abort_job(
         self,
@@ -181,6 +126,7 @@ class OrchestratedView(View, JobFactory):  # pylint: disable=abstract-method
                            token as positional argument
                            (default None)
         """
+
         @bp.route(rule, methods=["DELETE"], **(options or {}))
         @flask_handler(
             handler=services.abort_query_handler,
@@ -191,44 +137,39 @@ class OrchestratedView(View, JobFactory):  # pylint: disable=abstract-method
             json=flask_json,
         )
         def abort(
-            token: str, broadcast: bool = True, re_queue: bool = False,
-            origin: Optional[str] = None, reason: Optional[str] = None
+            token: str,
+            origin: Optional[str] = None,
+            reason: Optional[str] = None,
         ):
             """Abort job."""
-            if not re_queue:
-                self.orchestrator.dequeue(token, origin=origin, reason=reason)
-            r = None
-            if broadcast and self.config.ORCHESTRATION_ABORT_NOTIFICATIONS:
-                try:
-                    self.config.abort_notification_client.notify(
-                        query={
-                            "token": token,
-                            "broadcast": "false",
-                            "re-queue": "true" if re_queue else "false"
-                        },
-                        json=request.json
-                    )
-                # pylint: disable=broad-exception-caught
-                except Exception as exc_info:
-                    r = Response(
-                        "error while making abort-request to notification "
-                        + f"service for token '{token}': {exc_info}",
-                        mimetype="text/plain",
-                        status=502
-                    )
-            self.orchestrator.abort(
-                token,
-                origin=origin,
-                reason=reason,
-                block=True,
-                re_queue=re_queue
-            )
+            self.config.controller.message_push(token, "abort", origin, reason)
 
+            try:
+                self.config.controller.get_status(token)
+            except ValueError as exc_info:
+                if "Unknown job token" in str(exc_info):
+                    # job no longer exists or has never existed
+                    # either way, there is nothing to do
+                    if post_abort_hook is not None:
+                        post_abort_hook(token)
+                    return Response("OK", mimetype="text/plain", status=200)
+                return Response(
+                    f"FAILED: {exc_info}", mimetype="text/plain", status=500
+                )
+
+            time0 = time()
+            while (
+                self.config.controller.get_status(token)
+                not in ("completed", "aborted", "failed")
+                and time() - time0 < self.config.ORCHESTRA_ABORT_TIMEOUT
+            ):
+                sleep(self.config.ORCHESTRA_WORKER_INTERVAL)
             if post_abort_hook is not None:
                 post_abort_hook(token)
-
-            return r or Response(
-                f"successfully aborted '{token}'",
-                mimetype="text/plain",
-                status=200
-            )
+            if self.config.controller.get_status(token) in (
+                "completed",
+                "aborted",
+                "failed",
+            ):
+                return Response("OK", mimetype="text/plain", status=200)
+            return Response("FAILED", mimetype="text/plain", status=500)

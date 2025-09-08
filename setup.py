@@ -2,7 +2,7 @@ from setuptools import setup
 
 
 setup(
-    version="3.28.0",
+    version="4.0.0",
     name="dcm-common",
     description=(
         "common functions and components for the Digital Curation Manager"
@@ -16,14 +16,15 @@ setup(
             "flask>=3",
             "requests>=2",
             "pytest>=7",
-            "data-plumber-http>=0.3.0,<2",
+            "data-plumber-http>=1.0.0,<2",
         ],
         "db": [
             "flask>=3",
             "requests>=2",
             "psycopg[binary]>=3",
         ],
-        "orchestration": [
+        "orchestra": [
+            "dill>=0.4.0,<1",
             "flask>=3",
             "requests>=2",
         ],
@@ -42,13 +43,14 @@ setup(
         "dcm_common.db.sql",
         "dcm_common.db.sql.adapter",
         "dcm_common.models",
-        "dcm_common.orchestration",
+        "dcm_common.orchestra",
+        "dcm_common.orchestra.controller",
+        "dcm_common.orchestra.models",
         "dcm_common.plugins",
         "dcm_common.services",
         "dcm_common.services.adapter",
         "dcm_common.services.demo",
         "dcm_common.services.extensions",
-        "dcm_common.services.notification",
         "dcm_common.services.tests",
         "dcm_common.services.views",
     ],

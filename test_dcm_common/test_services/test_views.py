@@ -3,17 +3,13 @@
 import pytest
 from flask import Flask
 
-from dcm_common.db import NativeKeyValueStoreAdapter, MemoryStore
-from dcm_common.models import Token
-from dcm_common.orchestration import (
-    JobConfig, JobInfo, ScalableOrchestrator, Job
-)
-from dcm_common.services import DefaultView, ReportView, BaseConfig
+from dcm_common.orchestra.models import JobConfig, JobInfo, Token
+from dcm_common.services import DefaultView, ReportView, OrchestratedAppConfig
 
 
 @pytest.fixture(name="default_config")
 def _default_config():
-    return BaseConfig()
+    return OrchestratedAppConfig()
 
 
 @pytest.fixture(name="default_app")
@@ -21,10 +17,8 @@ def _default_app(default_config):
     app = Flask(__name__)
     app.config.from_object(default_config)
     app.register_blueprint(
-        DefaultView(
-            default_config, ready=lambda: True
-        ).get_blueprint(),
-        url_prefix="/"
+        DefaultView(default_config, ready=lambda: True).get_blueprint(),
+        url_prefix="/",
     )
     return app
 
@@ -61,7 +55,7 @@ def test_ready(default_client, default_config):
     app2 = Flask(__name__)
     app2.register_blueprint(
         DefaultView(default_config, ready=lambda: False).get_blueprint(),
-        url_prefix="/"
+        url_prefix="/",
     )
     default_client2 = app2.test_client()
     response2 = default_client2.get("/ready")
@@ -78,10 +72,7 @@ def test_identify(default_client, default_config):
     assert response.json == default_config.CONTAINER_SELF_DESCRIPTION
 
 
-@pytest.mark.parametrize(
-    "endpoint",
-    ["ping", "status", "identify"]
-)
+@pytest.mark.parametrize("endpoint", ["ping", "status", "identify"])
 def test_default_unknown_query_input(default_client, endpoint):
     """
     Test default-blueprint endpoints for acceptance of unknown query.
@@ -94,14 +85,14 @@ def test_default_unknown_query_input(default_client, endpoint):
 
 @pytest.fixture(name="report_tokens")
 def _report_token():
-    return (Token(False), Token(False), Token(False), Token(False))
+    return (Token("0"), Token("1"), Token("2"), Token("3"))
 
 
 @pytest.fixture(name="sample_report")
 def _sample_report(report_tokens):
     return {
         "token": report_tokens[1].json,
-        "progress": {"status": "completed", "verbose": "done", "numeric": 100}
+        "progress": {"status": "completed", "verbose": "done", "numeric": 100},
     }
 
 
@@ -109,29 +100,29 @@ def _sample_report(report_tokens):
 def _report_app(report_tokens, sample_report, default_config):
     app = Flask(__name__)
     app.config.from_object(default_config)
-    registry = NativeKeyValueStoreAdapter(MemoryStore())
-    registry.write(
+    default_config.controller.queue_push(
         report_tokens[0].value,
-        JobInfo(JobConfig({}), report_tokens[0]).json
+        JobInfo(JobConfig("test", {}, {}), report_tokens[0]).json,
     )
-    registry.write(
+    default_config.controller.queue_push(
         report_tokens[1].value,
-        JobInfo(JobConfig({}), report_tokens[1], report=sample_report).json | {
-            "metadata": {"completed": {"by": "", "datetime": ""}}
-        }
+        JobInfo(
+            JobConfig("test", {}, {}), report_tokens[1], report=sample_report
+        ).json
+        | {"metadata": {"completed": {"by": "", "datetime": ""}}},
     )
-    registry.write(
+    default_config.controller.queue_push(
         report_tokens[2].value,
-        JobInfo(JobConfig({}), report_tokens[2], report=sample_report).json | {
-            "metadata": {"aborted": {"by": "", "datetime": ""}}
-        }
+        JobInfo(
+            JobConfig("test", {}, {}), report_tokens[2], report=sample_report
+        ).json
+        | {"metadata": {"aborted": {"by": "", "datetime": ""}}},
     )
     app.register_blueprint(
         ReportView(
             default_config,
-            ScalableOrchestrator(lambda config: Job(), registry=registry)
         ).get_blueprint(),
-        url_prefix="/"
+        url_prefix="/",
     )
     return app
 
@@ -142,13 +133,7 @@ def _report_client(report_app):
 
 
 @pytest.mark.parametrize(
-    ("token_id", "status"),
-    [
-        (0, 503),
-        (1, 200),
-        (2, 200),
-        (3, 404)
-    ]
+    ("token_id", "status"), [(0, 503), (1, 200), (2, 200), (3, 404)]
 )
 def test_report(token_id, status, report_client, report_tokens, sample_report):
     """Test report route."""
@@ -178,13 +163,7 @@ def test_report_unknown_query_input(report_client):
 
 
 @pytest.mark.parametrize(
-    ("token_id", "status"),
-    [
-        (0, 503),
-        (1, 200),
-        (2, 200),
-        (3, 404)
-    ]
+    ("token_id", "status"), [(0, 503), (1, 200), (2, 200), (3, 404)]
 )
 def test_progress(
     token_id, status, report_client, report_tokens, sample_report

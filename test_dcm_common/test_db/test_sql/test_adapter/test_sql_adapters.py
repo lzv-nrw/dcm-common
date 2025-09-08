@@ -1,11 +1,11 @@
 """
-Test module for the classes `PostgreSQLAdapterSQL14` and `SQLiteAdapter3`
+Test module for the classes `PostgreSQLAdapter14` and `SQLiteAdapter3`
 of the `db`-subpackage.
 
 The same tests run for both classes to ensure uniformity of the adapters
 and their use.
 
-In order to run the tests for the class `PostgreSQLAdapterSQL14`,
+In order to run the tests for the class `PostgreSQLAdapter14`,
 a PostgreSQL-database with the following properties is required:
 * host: localhost
 * port: 5432
@@ -25,7 +25,7 @@ import pytest
 
 from dcm_common.db import (
     psycopg,
-    PostgreSQLAdapterSQL14,
+    PostgreSQLAdapter14,
     SQLiteAdapter3,
     TransactionResult,
     Transaction,
@@ -41,7 +41,7 @@ def check_requirements_postgres():
     if psycopg is None:
         return False, "Unable to import package 'psycopg'."
     try:
-        db = PostgreSQLAdapterSQL14(
+        db = PostgreSQLAdapter14(
             host="localhost",
             port="5432",
             database="postgres",
@@ -78,7 +78,7 @@ def get_sqlite_adapter(**kwargs):
 
 def get_postgres_adapter(**kwargs):
     """Returns PostgreSQL-adapter."""
-    return PostgreSQLAdapterSQL14(
+    return PostgreSQLAdapter14(
         **(
             {
                 "host": "localhost",
@@ -108,7 +108,9 @@ def get_db(db_id, request, init_defaults=True, **kwargs):
         db = get_postgres_adapter(**kwargs)
         # cleanup
         db.custom_cmd("DROP DATABASE test")  # delete testing-database
-        db.custom_cmd("CREATE DATABASE test").eval()  # re-create testing-database
+        db.custom_cmd(
+            "CREATE DATABASE test"
+        ).eval()  # re-create testing-database
         db.pool.close()
         db = get_postgres_adapter(**kwargs | {"database": "test"})
     else:
@@ -134,9 +136,7 @@ def get_db(db_id, request, init_defaults=True, **kwargs):
 
 
 parametrize_sql_adapter = pytest.mark.parametrize(
-    "db_id",
-    [SQLITE, POSTGRES],
-    ids=["SQLite", "PostgreSQL"]
+    "db_id", [SQLITE, POSTGRES], ids=["SQLite", "PostgreSQL"]
 )
 
 
@@ -210,9 +210,7 @@ def test_insert_delete(db_id, request):
     db = get_db(db_id, request)
 
     # table1 should be written first
-    key1 = db.insert(
-        table="table1", row={"name": "name table1"}
-    ).data
+    key1 = db.insert(table="table1", row={"name": "name table1"}).data
     key2 = db.insert(
         table="table2", row={"name": "name table2", "table1_id": key1}
     ).data
@@ -235,10 +233,12 @@ def test_get_row(db_id, request):
     key = db.insert(table="table1", row={"name": "name table1"}).data
 
     # The value of the primary key exists
-    assert sorted(db.get_row(table="table1", value=key).data) == sorted({
-        "id": key,
-        "name": "name table1",
-    })
+    assert sorted(db.get_row(table="table1", value=key).data) == sorted(
+        {
+            "id": key,
+            "name": "name table1",
+        }
+    )
     assert db.get_row(table="table1", value=key, cols=["name"]).data == {
         "name": "name table1"
     }
@@ -260,15 +260,11 @@ def test_get_row(db_id, request):
 
 @parametrize_sql_adapter
 def test_get_column(db_id, request):
-    """Test method `get_column` of the SQL adapters. """
+    """Test method `get_column` of the SQL adapters."""
     db = get_db(db_id, request)
 
-    key1 = db.insert(
-        table="table1", row={"name": "name1 table1"}
-    ).data
-    key2 = db.insert(
-        table="table1", row={"name": "name2 table1"}
-    ).data
+    key1 = db.insert(table="table1", row={"name": "name1 table1"}).data
+    key2 = db.insert(table="table1", row={"name": "name2 table1"}).data
     assert set(db.get_column(table="table1", column="id").data) == {
         key1,
         key2,
@@ -298,7 +294,7 @@ def test_insert_get_row_nested(db_id, request):
         "id": "uuid",
         "name": "text",
         "nested": "jsonb",
-        "nested_empty": "jsonb"
+        "nested_empty": "jsonb",
     }
 
     row = {
@@ -321,7 +317,7 @@ def test_insert_get_row_nested(db_id, request):
 
     assert db.get_rows("table3").data == [
         row | {"id": key},
-        row | {"id": key2}
+        row | {"id": key2},
     ]
 
 
@@ -370,7 +366,9 @@ def test_sql_injection_attack_insert_uuid(db_id, request):
         "CREATE TABLE table3 (id uuid PRIMARY KEY, col uuid)"
     ).success
 
-    value = "2af0a035-dc28-405f-b057-9866ec76a78f'); DROP TABLE table1 CASCADE; --"
+    value = (
+        "2af0a035-dc28-405f-b057-9866ec76a78f'); DROP TABLE table1 CASCADE; --"
+    )
     result = db.insert("table3", {"col": value})
     assert "table1" in db.get_table_names(True).data
     assert not result.success
@@ -457,7 +455,9 @@ def test_sql_injection_attack_update_uuid(db_id, request):
         "INSERT INTO table3 (id, col) VALUES ('a', '2af0a035-dc28-405f-b057-9866ec76a78f')"
     ).success
 
-    value = "2af0a035-dc28-405f-b057-9866ec76a78f'); DROP TABLE table1 CASCADE; --"
+    value = (
+        "2af0a035-dc28-405f-b057-9866ec76a78f'); DROP TABLE table1 CASCADE; --"
+    )
     result = db.update("table3", {"id": "a", "col": value})
     assert "table1" in db.get_table_names(True).data
     assert not result.success
@@ -774,12 +774,16 @@ def test_sql_injection_attack_col_names(db_id, request):
     assert "table1" in db.get_table_names(True).data
 
     with pytest.raises(ValueError) as exc_info:
-        db.get_delete_statement("table1", "a", "col; DROP TABLE table1 CASCADE; --")
+        db.get_delete_statement(
+            "table1", "a", "col; DROP TABLE table1 CASCADE; --"
+        )
     print(exc_info.value)
     assert "table1" in db.get_table_names(True).data
 
     with pytest.raises(ValueError) as exc_info:
-        db.get_select_statement("table1", "a", "col; DROP TABLE table1 CASCADE; --")
+        db.get_select_statement(
+            "table1", "a", "col; DROP TABLE table1 CASCADE; --"
+        )
     print(exc_info.value)
     assert "table1" in db.get_table_names(True).data
 
@@ -808,9 +812,7 @@ def test_sql_injection_attack_query(db_id, request):
 
     # insert a record that attempts an SQL injection attack
     # via the 'name' field
-    row2 = {
-        "name": "asd'; DROP TABLE table2; --"
-    }
+    row2 = {"name": "asd'; DROP TABLE table2; --"}
 
     # prepared statement: an attack does not delete table2
     db.insert(table="table2", row=row2).eval()
@@ -842,7 +844,7 @@ def test_sql_injection_attack_query(db_id, request):
         [{"group_id": "curator", "workspace_id": ""}],  # curator
         [
             {"group_id": "admin"},
-            {"group_id": "curator", "workspace_id": ""}
+            {"group_id": "curator", "workspace_id": ""},
         ],  # admin-curator
         [
             {"group_id": "admin"},
@@ -865,9 +867,7 @@ def test_many_to_many_relationships(db_id, request, groups):
 
     # Setup tables
     db.custom_cmd(
-        "CREATE TABLE test_users ("
-        + "id uuid PRIMARY KEY, "
-        + "name text)"
+        "CREATE TABLE test_users (" + "id uuid PRIMARY KEY, " + "name text)"
     )
     db.custom_cmd(
         "CREATE TABLE test_workspaces ("
@@ -894,9 +894,7 @@ def test_many_to_many_relationships(db_id, request, groups):
     keys_users = []
     for i in range(0, 2):
         keys_users.append(
-            db.insert(
-                table="test_users", row={"name": "user" + str(i)}
-            ).data
+            db.insert(table="test_users", row={"name": "user" + str(i)}).data
         )
     # insert workspaces
     keys_workspaces = []
@@ -914,14 +912,14 @@ def test_many_to_many_relationships(db_id, request, groups):
     relationships = []
     for group in groups:
         relationship = (
-                {"user_id": keys_users[0]}
-                | group
-                | (
-                    {"workspace_id": keys_workspaces[0]}
-                    if group["group_id"] == "curator"
-                    else {}
-                )
+            {"user_id": keys_users[0]}
+            | group
+            | (
+                {"workspace_id": keys_workspaces[0]}
+                if group["group_id"] == "curator"
+                else {}
             )
+        )
         relationships.append(relationship)
         assert db.insert(
             table="test_user_groups",
@@ -933,8 +931,7 @@ def test_many_to_many_relationships(db_id, request, groups):
         # attempt to rewrite an existing
         # tuple of (user_id, workspace_id, group_id)
         violate_uniqueness = db.insert(
-            table="test_user_groups",
-            row=relationships[0]
+            table="test_user_groups", row=relationships[0]
         )
         assert not violate_uniqueness.success
 
@@ -975,13 +972,12 @@ def test_many_to_many_relationships(db_id, request, groups):
             "test_user_groups",
             user_id,
             "user_id",
-            ["group_id", "workspace_id"]
+            ["group_id", "workspace_id"],
         )
         if not result.success:
             return result
         return TransactionResult(
-            True,
-            data=[GroupMembership(**x) for x in result.data]
+            True, data=[GroupMembership(**x) for x in result.data]
         )
 
     response_groups = get_groups_for_user_id(keys_users[0])
@@ -1030,9 +1026,13 @@ def test_insert_with_pk(db_id, request):
         ["text NULL", "a\r\na", "a\r\na"],
         ["text NULL", "\t", "\t"],
         ["text NULL", "\n", "\n"],
-        ["text NULL", """
-""", """
-"""],
+        [
+            "text NULL",
+            """
+""",
+            """
+""",
+        ],
         [
             "jsonb NULL",
             {"a": "|", "b": " | ", "c": "\n"},
@@ -1052,8 +1052,8 @@ def test_insert_with_pk(db_id, request):
         ["uuid NULL", None, None],
         [
             "jsonb NULL",
-            {"a": 1, "b": '"b\\\'', "c": True, "d": None, "e": {}, "f": []},
-            {"a": 1, "b": '"b\\\'', "c": True, "d": None, "e": {}, "f": []},
+            {"a": 1, "b": "\"b\\'", "c": True, "d": None, "e": {}, "f": []},
+            {"a": 1, "b": "\"b\\'", "c": True, "d": None, "e": {}, "f": []},
         ],
         ["jsonb NULL", {}, {}],
         [
@@ -1090,10 +1090,7 @@ def test_uuid_validation(db_id, request):
     db = get_db(db_id, request)
 
     assert db.custom_cmd(
-        "CREATE TABLE table3 ("
-        + "id uuid PRIMARY KEY, "
-        + "field uuid"
-        + ")"
+        "CREATE TABLE table3 (" + "id uuid PRIMARY KEY, " + "field uuid" + ")"
     ).success
 
     input_ = "no uuid"
@@ -1113,7 +1110,9 @@ def test_uuid_validation(db_id, request):
     ids=["newline-text", "newline-jsonb_plain", "newline-jsonb_nested"],
 )
 @parametrize_sql_adapter
-def test_encode_decode_special_characters(db_id, request, input_, type_, output):
+def test_encode_decode_special_characters(
+    db_id, request, input_, type_, output
+):
     """Test encoding/decoding for special characters."""
     db = get_db(db_id, request)
 
@@ -1193,9 +1192,7 @@ def test_insert_update_unknown_column(db_id, request):
     )
 
     # successful update
-    assert db.update(
-        "table3", {"id": id_, "name": "some_new_name"}
-    ).success
+    assert db.update("table3", {"id": id_, "name": "some_new_name"}).success
     # update with unknown column fails
     with pytest.raises(ValueError) as exc_info:
         db.update(
@@ -1221,8 +1218,7 @@ def test_generate_pk_types(db_id, request, type_, is_not_none):
     db = get_db(db_id, request)
 
     assert db.custom_cmd(
-        "CREATE TABLE table3 ("
-        + f"id {type_} PRIMARY KEY)"
+        "CREATE TABLE table3 (" + f"id {type_} PRIMARY KEY)"
     ).success
 
     id_ = db.insert("table3", {}).data
@@ -1249,9 +1245,7 @@ def test_read_file_not_exist(db_id, request):
     db = get_db(db_id, request)
 
     with pytest.raises(ValueError) as exc_info:
-        db.read_file(Path("unknown_file")).eval(
-            context="reading file:"
-        )
+        db.read_file(Path("unknown_file")).eval(context="reading file:")
     assert "unknown_file" in str(exc_info)
 
 
@@ -1325,7 +1319,7 @@ def test_transaction_simple(db_id, request):
             lambda result: result.data == "test2",
         ),
     ],
-    ids=["no-pp", "constructor-pp", "commit-pp", "commit-pp-override"]
+    ids=["no-pp", "constructor-pp", "commit-pp", "commit-pp-override"],
 )
 def test_transaction_post_process(
     db_id, request, constructor_pp, commit_pp, check

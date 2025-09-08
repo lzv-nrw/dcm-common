@@ -1,40 +1,57 @@
 """Test suite for the adapter-subpackage."""
 
 from time import sleep
+from urllib3.exceptions import HTTPError
 
 import pytest
-import dcm_import_module_sdk
 
 from dcm_common.services import APIResult, ServiceAdapter
 from dcm_common.models.data_model import get_model_serialization_test
 from dcm_common.services.tests import external_service, run_service
 
+try:
+    import dcm_demo_sdk
+
+    SDK_AVAILABLE = True
+
+    class _TestAdapter(ServiceAdapter):
+        """`ServiceAdapter` for automated tests."""
+
+        _SERVICE_NAME = "Test Module"
+        _SDK = dcm_demo_sdk  # used as placeholder for OpenAPITools-sdks
+
+        def _get_api_clients(self):
+            client = self._SDK.ApiClient(
+                self._SDK.Configuration(host=self.url)
+            )
+            return self._SDK.DefaultApi(client), self._SDK.DemoApi(client)
+
+        def _get_api_endpoint(self):
+            return self._api_client.demo
+
+        def _get_abort_endpoint(self):
+            return self._api_client.abort
+
+        def _build_request_body(self, base_request_body, target):
+            return base_request_body
+
+        def success(self, info):
+            return info.report.get("data", {}).get("success", False)
+
+except ImportError:
+    SDK_AVAILABLE = False
+
+    class _TestAdapter:
+        pass
+
 
 test_stage_info_json = get_model_serialization_test(
-    APIResult, (
+    APIResult,
+    (
         ((False,), {}),
         ((True, True), {"report": {"host": ""}}),
-    )
+    ),
 )
-
-
-class _TestAdapter(ServiceAdapter):
-    """`ServiceAdapter` for automated tests."""
-    _SERVICE_NAME = "Test Module"
-    _SDK = dcm_import_module_sdk  # used as placeholder for OpenAPITools-sdks
-
-    def _get_api_clients(self):
-        client = self._SDK.ApiClient(self._SDK.Configuration(host=self._url))
-        return self._SDK.DefaultApi(client), self._SDK.ImportApi(client)
-
-    def _get_api_endpoint(self):
-        return self._api_client.import_external
-
-    def _build_request_body(self, base_request_body, target):
-        return base_request_body
-
-    def success(self, info):
-        return info.report.get("data", {}).get("success", False)
 
 
 @pytest.fixture(name="port")
@@ -54,9 +71,7 @@ def _adapter(url):
 
 @pytest.fixture(name="request_body")
 def _request_body():
-    return {
-        "import": {"plugin": "demo", "args": {"number": 1}}
-    }
+    return {"demo": {"success": True}}
 
 
 @pytest.fixture(name="token")
@@ -64,7 +79,7 @@ def _token():
     return {
         "value": "eb7948a58594df3400696b6ce12013b0e26348ef27e",
         "expires": True,
-        "expires_at": "2024-08-09T13:15:10+00:00"
+        "expires_at": "2024-08-09T13:15:10+00:00",
     }
 
 
@@ -77,30 +92,18 @@ def _report(url, token, request_body):
         "progress": {
             "status": "completed",
             "verbose": "Job terminated normally.",
-            "numeric": 100
+            "numeric": 100,
         },
         "log": {
             "EVENT": [
                 {
                     "datetime": "2024-08-09T12:15:10+00:00",
                     "origin": "Test Module",
-                    "body": "Some event"
+                    "body": "Some event",
                 },
             ]
         },
-        "data": {
-            "success": True,
-            "IEs": {
-                "ie0": {
-                    "path": "ie/4a814fe6-b44e-4546-95ec-5aee27cc1d8c",
-                    "sourceIdentifier": "test:oai_dc:f50036dd-b4ef",
-                    "fetchedPayload": True,
-                    "logId": "0@demo-plugin",
-                    "IPIdentifier": None
-                }
-            },
-            "IPs": {}
-        }
+        "data": {"success": True},
     }
 
 
@@ -108,25 +111,23 @@ def _report(url, token, request_body):
 def _test_api(port, token, report, run_service):
     run_service(
         routes=[
-            ("/import/external", lambda: (token, 201), ["POST"]),
+            ("/demo", lambda: (token, 201), ["POST"]),
+            ("/demo", lambda: ("OK", 200), ["DELETE"]),
             ("/report", lambda: (report, 200), ["GET"]),
         ],
-        port=port
+        port=port,
     )
 
 
 @pytest.fixture(name="run_result")
-def _run_result(
-    adapter: _TestAdapter, request_body, test_api
-):
+def _run_result(adapter: _TestAdapter, request_body, test_api):
     """Returns result of `_TestAdapter.run`."""
     adapter.run(request_body, None, info := APIResult())
     return info
 
 
-def test_run_minimal(
-    adapter: _TestAdapter, request_body, report, test_api
-):
+@pytest.mark.skipif(not SDK_AVAILABLE, reason="missing dcm-demo-sdk")
+def test_run_minimal(adapter: _TestAdapter, request_body, report, test_api):
     """Test method `run` of `_TestAdapter`."""
     adapter.run(request_body, None, info := APIResult())
 
@@ -135,6 +136,7 @@ def test_run_minimal(
     assert info.report == report
 
 
+@pytest.mark.skipif(not SDK_AVAILABLE, reason="missing dcm-demo-sdk")
 def test_run_hooks(adapter: _TestAdapter, request_body, test_api):
     """
     Test execution of post-submission hooks in method `run` of
@@ -143,16 +145,19 @@ def test_run_hooks(adapter: _TestAdapter, request_body, test_api):
 
     hook_info = {}
     adapter.run(
-        request_body, None, info := APIResult(),
+        request_body,
+        None,
+        info := APIResult(),
         post_submission_hooks=(
             lambda token: hook_info.update({"token": token}),
-        )
+        ),
     )
 
     assert "token" in hook_info
     assert hook_info["token"] == info.report["token"]["value"]
 
 
+@pytest.mark.skipif(not SDK_AVAILABLE, reason="missing dcm-demo-sdk")
 def test_run_no_connection(adapter: _TestAdapter, request_body):
     """
     Test behavior of method `run` of `_TestAdapter` if no connection
@@ -166,13 +171,14 @@ def test_run_no_connection(adapter: _TestAdapter, request_body):
     assert "no connection" in str(info.report)
 
 
+@pytest.mark.skipif(not SDK_AVAILABLE, reason="missing dcm-demo-sdk")
 def test_run_bad_request_body(adapter: _TestAdapter, request_body):
     """
     Test behavior of method `run` of `_TestAdapter` if request body
     is bad.
     """
 
-    del request_body["import"]
+    del request_body["demo"]
 
     adapter.run(request_body, None, info := APIResult())
 
@@ -181,18 +187,15 @@ def test_run_bad_request_body(adapter: _TestAdapter, request_body):
     assert "invalid request body" in str(info.report)
 
 
-def test_run_rejected(
-    adapter: _TestAdapter, request_body, port, run_service
-):
+@pytest.mark.skipif(not SDK_AVAILABLE, reason="missing dcm-demo-sdk")
+def test_run_rejected(adapter: _TestAdapter, request_body, port, run_service):
     """
     Test behavior of method `run` of `_TestAdapter` if request is
     rejected.
     """
 
     msg = "rejected"
-    run_service(
-        routes=[("/import/external", lambda: (msg, 422), ["POST"])], port=port
-    )
+    run_service(routes=[("/demo", lambda: (msg, 422), ["POST"])], port=port)
 
     adapter.run(request_body, None, info := APIResult())
 
@@ -201,6 +204,7 @@ def test_run_rejected(
     assert msg in str(info.report)
 
 
+@pytest.mark.skipif(not SDK_AVAILABLE, reason="missing dcm-demo-sdk")
 def test_run_request_timeout_initial(
     adapter: _TestAdapter, request_body, port, run_service
 ):
@@ -213,9 +217,10 @@ def test_run_request_timeout_initial(
     adapter.request_timeout = 0.01
 
     def _import():
-        sleep(2*adapter.request_timeout)
+        sleep(2 * adapter.request_timeout)
         return msg, 400
-    run_service(routes=[("/import/external", _import, ["POST"])], port=port)
+
+    run_service(routes=[("/demo", _import, ["POST"])], port=port)
 
     adapter.run(request_body, None, info := APIResult())
 
@@ -225,6 +230,7 @@ def test_run_request_timeout_initial(
     assert "timed out" in str(info.report)
 
 
+@pytest.mark.skipif(not SDK_AVAILABLE, reason="missing dcm-demo-sdk")
 def test_run_request_timeout_polling(
     adapter: _TestAdapter, request_body, port, token, run_service
 ):
@@ -237,14 +243,15 @@ def test_run_request_timeout_polling(
     adapter.request_timeout = 0.01
 
     def _get_report():
-        sleep(2*adapter.request_timeout)
+        sleep(2 * adapter.request_timeout)
         return msg, 400
+
     run_service(
         routes=[
-            ("/import/external", lambda: (token, 201), ["POST"]),
+            ("/demo", lambda: (token, 201), ["POST"]),
             ("/report", _get_report, ["GET"]),
         ],
-        port=port
+        port=port,
     )
 
     adapter.run(request_body, None, info := APIResult())
@@ -255,6 +262,7 @@ def test_run_request_timeout_polling(
     assert "timed out" in str(info.report)
 
 
+@pytest.mark.skipif(not SDK_AVAILABLE, reason="missing dcm-demo-sdk")
 def test_run_job_timeout(
     adapter: _TestAdapter, request_body, port, token, report, run_service
 ):
@@ -267,10 +275,10 @@ def test_run_job_timeout(
     adapter.interval = 0.01
     run_service(
         routes=[
-            ("/import/external", lambda: (token, 201), ["POST"]),
+            ("/demo", lambda: (token, 201), ["POST"]),
             ("/report", lambda: (report, 503), ["GET"]),
         ],
-        port=port
+        port=port,
     )
 
     adapter.run(request_body, None, info := APIResult())
@@ -280,6 +288,7 @@ def test_run_job_timeout(
     assert "timed out" in str(info.report)
 
 
+@pytest.mark.skipif(not SDK_AVAILABLE, reason="missing dcm-demo-sdk")
 def test_run_retry(
     adapter: _TestAdapter, request_body, port, token, report, run_service
 ):
@@ -297,23 +306,23 @@ def test_run_retry(
         nonlocal retry_submission
         if retry_submission < adapter.max_retries:
             retry_submission += 1
-            sleep(2*adapter.request_timeout)
+            sleep(2 * adapter.request_timeout)
         return token, 201
 
     def report_success_on_second_try():
         nonlocal retry_report
         # factor 4 due to OpenAPI tools-client's auto-retry for GET
-        if retry_report < 4*adapter.max_retries:
+        if retry_report < 4 * adapter.max_retries:
             retry_report += 1
-            sleep(2*adapter.request_timeout)
+            sleep(2 * adapter.request_timeout)
         return report, 200
 
     run_service(
         routes=[
-            ("/import/external", submission_success_on_second_try, ["POST"]),
+            ("/demo", submission_success_on_second_try, ["POST"]),
             ("/report", report_success_on_second_try, ["GET"]),
         ],
-        port=port
+        port=port,
     )
 
     adapter.run(request_body, None, info := APIResult())
@@ -322,6 +331,7 @@ def test_run_retry(
     assert info.success
 
 
+@pytest.mark.skipif(not SDK_AVAILABLE, reason="missing dcm-demo-sdk")
 def test_run_retry_fail(
     adapter: _TestAdapter, request_body, port, token, report, run_service
 ):
@@ -337,15 +347,15 @@ def test_run_retry_fail(
         nonlocal retry
         if retry < adapter.max_retries + 1:
             retry += 1
-            sleep(2*adapter.request_timeout)
+            sleep(2 * adapter.request_timeout)
         return token, 201
 
     run_service(
         routes=[
-            ("/import/external", success_on_second_try, ["POST"]),
+            ("/demo", success_on_second_try, ["POST"]),
             ("/report", lambda: (report, 200), ["GET"]),
         ],
-        port=port
+        port=port,
     )
 
     adapter.run(request_body, None, info := APIResult())
@@ -355,6 +365,7 @@ def test_run_retry_fail(
     assert "timed out" in str(info.report)
 
 
+@pytest.mark.skipif(not SDK_AVAILABLE, reason="missing dcm-demo-sdk")
 def test_success(adapter: _TestAdapter, run_result: APIResult):
     """Test method `success` of `_TestAdapter`."""
     assert adapter.success(run_result)
@@ -362,6 +373,7 @@ def test_success(adapter: _TestAdapter, run_result: APIResult):
     assert not adapter.success(run_result)
 
 
+@pytest.mark.skipif(not SDK_AVAILABLE, reason="missing dcm-demo-sdk")
 def test_get_info(adapter: _TestAdapter, request_body, test_api):
     """Test method `get_info` of `_TestAdapter`."""
     adapter.run(request_body, None, info := APIResult())
@@ -372,6 +384,7 @@ def test_get_info(adapter: _TestAdapter, request_body, test_api):
     assert info.success == _info.success
 
 
+@pytest.mark.skipif(not SDK_AVAILABLE, reason="missing dcm-demo-sdk")
 def test_get_info_override(adapter: _TestAdapter, request_body, test_api):
     """Test method `get_info` of `_TestAdapter` with override-arg."""
     adapter.run(request_body, None, info := APIResult())
@@ -382,7 +395,7 @@ def test_get_info_override(adapter: _TestAdapter, request_body, test_api):
 
     _info = adapter.get_info(
         info.report["token"]["value"],
-        endpoint=lambda token, _request_timeout: FakeResponse()
+        endpoint=lambda token, _request_timeout: FakeResponse(),
     )
 
     assert info.report["progress"] == _info.report
@@ -390,9 +403,43 @@ def test_get_info_override(adapter: _TestAdapter, request_body, test_api):
     assert _info.success is None
 
 
+@pytest.mark.skipif(not SDK_AVAILABLE, reason="missing dcm-demo-sdk")
 def test_get_report(adapter: _TestAdapter, request_body, test_api):
     """Test method `get_info` of `_TestAdapter`."""
     adapter.run(request_body, None, info := APIResult())
     _report = adapter.get_report(info.report["token"]["value"])
 
     assert info.report == _report
+
+
+@pytest.mark.skipif(not SDK_AVAILABLE, reason="missing dcm-demo-sdk")
+def test_abort(adapter: _TestAdapter, test_api):
+    """Test method `abort` of `_TestAdapter`."""
+    adapter.abort(
+        None,
+        ("0", {"origin": "test", "reason": "test reason"}),
+    )
+
+
+@pytest.mark.skipif(not SDK_AVAILABLE, reason="missing dcm-demo-sdk")
+def test_abort_timeout(run_service, port, adapter: _TestAdapter):
+    """Test method `abort` of `_TestAdapter` with Timeout."""
+
+    adapter.request_timeout = 0.01
+
+    def demo_with_timeout():
+        sleep(2 * adapter.request_timeout)
+        return "NO", 500
+
+    run_service(
+        routes=[
+            ("/demo", demo_with_timeout, ["DELETE"]),
+        ],
+        port=port,
+    )
+
+    with pytest.raises(HTTPError) as exc_info:
+        adapter.abort(
+            None,
+            ("0", {"origin": "test", "reason": "test reason"}),
+        )

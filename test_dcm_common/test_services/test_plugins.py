@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from importlib.metadata import version
 
 import pytest
+
 if version("data_plumber_http").startswith("1."):
     TEST_PLUGIN_TYPE = True
 else:  # TODO remove legacy-support
@@ -115,7 +116,6 @@ if TEST_PLUGIN_TYPE:
         if output.last_status != Responses().GOOD.status:
             print(output.last_message)
 
-
     @pytest.mark.parametrize(
         ("json", "status"),
         (
@@ -156,7 +156,6 @@ if TEST_PLUGIN_TYPE:
             }
         ).assemble()
         assert handler.run(json=json).last_status == status
-
 
     @pytest.mark.parametrize(
         ("json", "status"),

@@ -13,6 +13,7 @@ class Daemon(metaclass=abc.ABCMeta):
     """
     Base class for different types of daemon-implementations.
     """
+
     def __init__(self) -> None:
         self._daemon: Optional[Thread] = None
         self._stop = Event()
@@ -34,7 +35,8 @@ class Daemon(metaclass=abc.ABCMeta):
         """
         return (
             self.active
-            and self._service is not None and self._service.is_alive()
+            and self._service is not None
+            and self._service.is_alive()
         )
 
     @abc.abstractmethod
@@ -60,7 +62,7 @@ class Daemon(metaclass=abc.ABCMeta):
                         "\033[31mERROR\033[0m Daemon encountered an "
                         + "unrecoverable error while trying to (re-)start a "
                         + f"service: {exc_info} Shutting down now..",
-                        file=sys.stderr
+                        file=sys.stderr,
                     )
                     self._stop.set()
                     break
@@ -68,7 +70,10 @@ class Daemon(metaclass=abc.ABCMeta):
             self._skip_sleep.clear()
 
     def run(
-        self, interval: Optional[float] = None, daemon: bool = False, block: bool = False
+        self,
+        interval: Optional[float] = None,
+        daemon: bool = False,
+        block: bool = False,
     ) -> None:
         """
         Start providing the service.
@@ -178,8 +183,10 @@ class FDaemon(Daemon):
     """
 
     def __init__(
-        self, factory: Callable[[...], Thread], args: Optional[tuple] = None,
-        kwargs: Optional[Mapping] = None
+        self,
+        factory: Callable[[...], Thread],
+        args: Optional[tuple] = None,
+        kwargs: Optional[Mapping] = None,
     ) -> None:
         self._factory = factory
         self._args = args or ()

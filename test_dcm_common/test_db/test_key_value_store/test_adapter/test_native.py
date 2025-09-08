@@ -9,9 +9,13 @@ from threading import Thread
 import pytest
 
 from dcm_common.db import (
-    KeyValueStoreAdapter, NativeKeyValueStoreAdapter, MemoryStore
+    KeyValueStoreAdapter,
+    NativeKeyValueStoreAdapter,
+    MemoryStore,
 )
-from dcm_common.db.key_value_store.adapter.native import NonThreadedNativeKeyValueStoreAdapter
+from dcm_common.db.key_value_store.adapter.native import (
+    NonThreadedNativeKeyValueStoreAdapter,
+)
 
 
 @pytest.fixture(name="db")
@@ -92,13 +96,13 @@ def test_keys(db: NativeKeyValueStoreAdapter):
     """Test method `keys` of class `NativeKeyValueStoreAdapter`."""
     assert db.keys() == ()
     db.write("key", "value")
-    assert db.keys() == ("key", )
+    assert db.keys() == ("key",)
 
 
 @pytest.mark.parametrize(
     "adapter",
     [NonThreadedNativeKeyValueStoreAdapter, NativeKeyValueStoreAdapter],
-    ids=["bad", "ok"]
+    ids=["bad", "ok"],
 )
 def test_concurrency(adapter):
     """

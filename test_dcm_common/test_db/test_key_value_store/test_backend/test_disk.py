@@ -59,7 +59,12 @@ def test_read_non_existing(fkvs: JSONFileStore):
 def test_read(fkvs: JSONFileStore):
     """Test method `read` of class `JSONFileStore`."""
     for value in (
-        "value", 1, 1.25, True, ["value", True], {"p1": 1, "p2": "value"},
+        "value",
+        1,
+        1.25,
+        True,
+        ["value", True],
+        {"p1": 1, "p2": "value"},
     ):
         fkvs.write("key", value)
         assert fkvs.read("key") == value
@@ -84,7 +89,7 @@ def test_keys(fkvs: JSONFileStore):
     """Test method `keys` of class `JSONFileStore`."""
     assert fkvs.keys() == ()
     fkvs.write("key", "value")
-    assert fkvs.keys() == ("key", )
+    assert fkvs.keys() == ("key",)
 
 
 def test_persistence_read(db_file_storage):
@@ -115,7 +120,7 @@ def test_persistence_keys(db_file_storage):
     two instances (keys from disk).
     """
     fkvs = JSONFileStore(db_file_storage)
-    assert fkvs.keys() == ("key", )
+    assert fkvs.keys() == ("key",)
 
 
 def test_persistence_keys_caching(db_file_storage):
@@ -152,4 +157,4 @@ def test_bad_files(db_dir):
     (dir_ / "ok-format").write_text(
         '{"key": "key", "value": "value"}', encoding="utf-8"
     )
-    assert JSONFileStore(dir_).keys() == ("key", )
+    assert JSONFileStore(dir_).keys() == ("key",)

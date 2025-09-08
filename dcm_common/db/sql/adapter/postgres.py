@@ -31,6 +31,7 @@ class PostgreSQLConnection(Connection):
     Implementation of a PostgreSQL-connection based on the `psycopg`-
     package.
     """
+
     # pylint: disable=no-member
     def __init__(
         self,
@@ -41,7 +42,7 @@ class PostgreSQLConnection(Connection):
         user: Optional[str] = None,
         password: Optional[str] = None,
         passfile: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ):
         self._host = host
         self._port = port
@@ -59,16 +60,18 @@ class PostgreSQLConnection(Connection):
             user=self._user,
             password=self._password,
             passfile=self._passfile,
-            autocommit=True
+            autocommit=True,
         )
 
         class UUIDLoader(psycopg.adapt.Loader):
             """Use custom loader-methods for UUID."""
+
             def load(self, data):
                 return bytes(data).decode("utf-8")
 
         class JSONBoader(psycopg.adapt.Loader):
             """Use custom loader-methods for JSONB."""
+
             def load(self, data):
                 return bytes(data).decode("utf-8")
 
@@ -272,7 +275,9 @@ class PostgreSQLAdapter14(PooledConnectionAdapter, SQLAdapter):
         )
         if len(raw.data) == 0:
             return TransactionResult(
-                False, msg=f"Table '{table}' does not exist.", raw=raw,
+                False,
+                msg=f"Table '{table}' does not exist.",
+                raw=raw,
             )
         return self.build_response(
             raw,
@@ -295,13 +300,13 @@ class PostgreSQLAdapter14(PooledConnectionAdapter, SQLAdapter):
         )
         if len(raw.data) == 0:
             return TransactionResult(
-                False, msg=f"Table '{table}' does not exist.", raw=raw,
+                False,
+                msg=f"Table '{table}' does not exist.",
+                raw=raw,
             )
         return self.build_response(
             raw,
-            post_process=lambda r: [
-                colinfo[0] for colinfo in r.data
-            ],
+            post_process=lambda r: [colinfo[0] for colinfo in r.data],
         )
 
     @lru_cache(maxsize=_DB_ADAPTER_SCHEMA_CACHE_SIZE)
@@ -325,9 +330,7 @@ class PostgreSQLAdapter14(PooledConnectionAdapter, SQLAdapter):
                 msg=f"Table '{table}' does not exist or has no primary key.",
                 raw=raw,
             )
-        return self.build_response(
-            raw, post_process=lambda x: x.data[0][0]
-        )
+        return self.build_response(raw, post_process=lambda x: x.data[0][0])
 
     def clear_schema_cache(self):
         # omit clearing cache for _build_base as it does not change

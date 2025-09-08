@@ -522,9 +522,7 @@ class SQLAdapter(metaclass=abc.ABCMeta):
     def _validate_table_name(self, table: str) -> None:
         """Raises `ValueError` if `table` is unknown."""
         for clear in [False, True]:
-            if (
-                table in self.get_table_names(clear_schema_cache=clear).eval()
-            ):
+            if table in self.get_table_names(clear_schema_cache=clear).eval():
                 return
         raise ValueError(f"Unknown table '{table}'.")
 
@@ -535,12 +533,11 @@ class SQLAdapter(metaclass=abc.ABCMeta):
                 table, clear_schema_cache=clear
             ).eval()
             if (
-                (unknown_col := next(
+                unknown_col := next(
                     (x for x in cols if x not in known_cols),
                     None,
-                ))
-                is None
-            ):
+                )
+            ) is None:
                 return
         raise ValueError(
             f"Unknown column '{unknown_col}' for table '{table}'."
@@ -802,18 +799,14 @@ class SQLAdapter(metaclass=abc.ABCMeta):
         except TypeError as exc_info:
             return self.build_response(RawTransactionResult(error=exc_info))
         if len(raw.data) == 0:
-            return self.build_response(
-                raw, post_process=lambda r: []
-            )
+            return self.build_response(raw, post_process=lambda r: [])
 
         types = self._get_column_types(table).eval()
         return self.build_response(
             raw,
             post_process=lambda r: [
-                {
-                    col: self._encode(v, types[col])
-                    for col, v in zip(cols, row)
-                } for row in r.data
+                {col: self._encode(v, types[col]) for col, v in zip(cols, row)}
+                for row in r.data
             ],
         )
 

@@ -11,14 +11,13 @@ import pytest
 from dcm_common import LoggingContext as Context
 from dcm_common.services.tests import run_service, external_service
 from dcm_common.plugins import PluginInterface, Argument, Signature, JSONType
-from dcm_common.services.notification import (
-    app_factory as notify_app_factory, Topic, HTTPMethod
-)
-from dcm_common.db import MemoryStore, NativeKeyValueStoreAdapter
 from dcm_common.services.demo import app_factory
 from dcm_common.services.demo.config import AppConfig
+from dcm_common.orchestra import dillignore
+
 try:
     import dcm_demo_sdk
+
     sdk_available = True
 except ImportError:
     sdk_available = False
@@ -26,14 +25,16 @@ except ImportError:
 
 @pytest.fixture(name="testing_config")
 def _testing_config(temporary_directory):
+    @dillignore("db", "controller", "worker_pool")
     class _AppConfig(AppConfig):
         FS_MOUNT_POINT = temporary_directory
         TESTING = True
-        ORCHESTRATION_DAEMON_INTERVAL = 0.001
-        ORCHESTRATION_ORCHESTRATOR_INTERVAL = 0.001
-        ORCHESTRATION_ABORT_NOTIFICATIONS_STARTUP_INTERVAL = 0.001
-        DB_ADAPTER_STARTUP_INTERVAL = 0.001
+        ORCHESTRA_DAEMON_INTERVAL = 0.01
+        ORCHESTRA_WORKER_INTERVAL = 0.01
+        ORCHESTRA_WORKER_ARGS = {"messages_interval": 0.01}
+        DB_ADAPTER_STARTUP_INTERVAL = 0.01
         DB_ADAPTER_STARTUP_IMMEDIATELY = True
+
     return _AppConfig
 
 
@@ -45,10 +46,9 @@ def _demo_app(testing_config):
 @pytest.fixture(name="sdk_clients")
 def _sdk_clients():
     def _get_api_clients(host):
-        client = dcm_demo_sdk.ApiClient(
-            dcm_demo_sdk.Configuration(host=host)
-        )
+        client = dcm_demo_sdk.ApiClient(dcm_demo_sdk.Configuration(host=host))
         return dcm_demo_sdk.DefaultApi(client), dcm_demo_sdk.DemoApi(client)
+
     return _get_api_clients
 
 
@@ -56,6 +56,7 @@ def _sdk_clients():
 def _default_client(sdk_clients):
     def _get_api_client(host):
         return sdk_clients(host)[0]
+
     return _get_api_client
 
 
@@ -63,6 +64,7 @@ def _default_client(sdk_clients):
 def _demo_client(sdk_clients):
     def _get_api_client(host):
         return sdk_clients(host)[1]
+
     return _get_api_client
 
 
@@ -79,18 +81,22 @@ def wait_for_report(demo_api, token):
 
 
 @pytest.mark.skipif(not sdk_available, reason="missing dcm-demo-sdk")
-def test_sdk_ping(demo_app, default_client, run_service):
+def test_sdk_ping(testing_config, default_client, run_service):
     """Run minimal test for demo-app."""
-    run_service(app=demo_app, port=8080)
-    default_api: dcm_demo_sdk.DefaultApi = default_client("http://localhost:8080")
+    run_service(from_factory=lambda: app_factory(testing_config()), port=8080)
+    default_api: dcm_demo_sdk.DefaultApi = default_client(
+        "http://localhost:8080"
+    )
     assert default_api.ping() == "pong"
 
 
 @pytest.mark.skipif(not sdk_available, reason="missing dcm-demo-sdk")
-def test_sdk_identify(demo_app, default_client, run_service, testing_config):
+def test_sdk_identify(testing_config, default_client, run_service):
     """Test identify-implementation for demo-app."""
-    run_service(app=demo_app, port=8080)
-    default_api: dcm_demo_sdk.DefaultApi = default_client("http://localhost:8080")
+    run_service(from_factory=lambda: app_factory(testing_config()), port=8080)
+    default_api: dcm_demo_sdk.DefaultApi = default_client(
+        "http://localhost:8080"
+    )
 
     # apparently, the OpenAPI-Generator sdk model_dump renames fields in json
     # so the data has to be converted to a json beforehand (which does not
@@ -103,10 +109,9 @@ def test_sdk_identify(demo_app, default_client, run_service, testing_config):
             if v is not None
         }
 
-    assert (
-        clear_null_values(default_api.identify().to_dict())
-        == clear_null_values(testing_config().CONTAINER_SELF_DESCRIPTION)
-    )
+    assert clear_null_values(
+        default_api.identify().to_dict()
+    ) == clear_null_values(testing_config().CONTAINER_SELF_DESCRIPTION)
 
 
 @pytest.mark.skipif(not sdk_available, reason="missing dcm-demo-sdk")
@@ -150,7 +155,7 @@ def test_sdk_identify_w_complex_array_plugin_arg_signature(
     class ThisAppConfig(testing_config):
         AVAILABLE_PLUGINS = {"demo-plugin": PluginWithComplexArgSignature()}
 
-    run_service(app=app_factory(ThisAppConfig(), as_process=True), port=8080)
+    run_service(from_factory=lambda: app_factory(ThisAppConfig()), port=8080)
     default_api: dcm_demo_sdk.DefaultApi = default_client(
         "http://localhost:8080"
     )
@@ -165,39 +170,30 @@ def test_sdk_identify_w_complex_array_plugin_arg_signature(
             for k, v in json.items()
             if v is not None
         }
+
     # pylint: disable=comparison-with-callable
-    assert (
-        clear_null_values(default_api.identify().to_dict())
-        == clear_null_values(ThisAppConfig().CONTAINER_SELF_DESCRIPTION)
-    )
+    assert clear_null_values(
+        default_api.identify().to_dict()
+    ) == clear_null_values(ThisAppConfig().CONTAINER_SELF_DESCRIPTION)
 
 
 def test_demo_minimal_flask_client(testing_config):
     """Run test for demo-app with minimal job."""
-    testing_config.ORCHESTRATION_AT_STARTUP = False
-    client = app_factory(testing_config()).test_client()
+    app = app_factory(testing_config())
+    client = app.test_client()
     token = client.post("/demo", json={"demo": {"duration": 0}}).json["value"]
-    client.put("/orchestration?until-idle", json={})
-    time0 = time()
-    while time() - time0 < 2:
-        r = client.get(f"/report?token={token}")
-        if r.status_code == 200:
-            break
-        sleep(0.01)
-    assert r.json["progress"]["status"] == "completed"
-    assert r.json["data"]["success"]
+    app.extensions["orchestra"].stop(stop_on_idle=True)
+    report = client.get(f"/report?token={token}").json
+    assert report["progress"]["status"] == "completed"
+    assert report["data"]["success"]
 
 
 @pytest.mark.skipif(not sdk_available, reason="missing dcm-demo-sdk")
-def test_sdk_demo_minimal(demo_app, demo_client, run_service):
+def test_sdk_demo_minimal(testing_config, demo_client, run_service):
     """Run test for demo-app with minimal job."""
-    run_service(app=demo_app, port=8080)
+    run_service(from_factory=lambda: app_factory(testing_config()), port=8080)
     demo_api: dcm_demo_sdk.DemoApi = demo_client("http://localhost:8080")
-    token = demo_api.demo(
-        {
-            "demo": {"duration": 0}
-        }
-    )
+    token = demo_api.demo({"demo": {"duration": 0}})
     report = wait_for_report(demo_api, token).model_dump()
 
     assert report["progress"]["status"] == "completed"
@@ -205,16 +201,17 @@ def test_sdk_demo_minimal(demo_app, demo_client, run_service):
 
 
 @pytest.mark.skipif(not sdk_available, reason="missing dcm-demo-sdk")
-def test_sdk_demo_complex(demo_app, demo_client, run_service):
+def test_sdk_demo_complex(testing_config, demo_client, run_service):
     """Run test for demo-app with complex job."""
-    run_service(app=demo_app, port=8080)
-    run_service(app=demo_app, port=8081)
-    run_service(app=demo_app, port=8082)
+    run_service(from_factory=lambda: app_factory(testing_config()), port=8080)
+    run_service(from_factory=lambda: app_factory(testing_config()), port=8081)
+    run_service(from_factory=lambda: app_factory(testing_config()), port=8082)
     demo_api: dcm_demo_sdk.DemoApi = demo_client("http://localhost:8080")
     token = demo_api.demo(
         {
             "demo": {
-                "duration": 0, "children": [
+                "duration": 0,
+                "children": [
                     {
                         "host": "http://localhost:8081",
                         "body": {
@@ -223,11 +220,11 @@ def test_sdk_demo_complex(demo_app, demo_client, run_service):
                                 "children": [
                                     {
                                         "host": "http://localhost:8082",
-                                        "body": {"demo": {"duration": 0}}
+                                        "body": {"demo": {"duration": 0}},
                                     }
-                                ]
+                                ],
                             }
-                        }
+                        },
                     },
                     {
                         "host": "http://localhost:8081",
@@ -237,13 +234,13 @@ def test_sdk_demo_complex(demo_app, demo_client, run_service):
                                 "children": [
                                     {
                                         "host": "http://localhost:8082",
-                                        "body": {"demo": {"duration": 0}}
+                                        "body": {"demo": {"duration": 0}},
                                     }
-                                ]
+                                ],
                             }
-                        }
-                    }
-                ]
+                        },
+                    },
+                ],
             }
         }
     )
@@ -256,15 +253,15 @@ def test_sdk_demo_complex(demo_app, demo_client, run_service):
 
 
 @pytest.mark.skipif(not sdk_available, reason="missing dcm-demo-sdk")
-def test_sdk_demo_duration(demo_app, demo_client, run_service):
+def test_sdk_demo_duration(testing_config, demo_client, run_service):
     """Run test for demo-app and job duration-setting."""
-    run_service(app=demo_app, port=8080)
+    run_service(from_factory=lambda: app_factory(testing_config()), port=8080)
     demo_api: dcm_demo_sdk.DemoApi = demo_client("http://localhost:8080")
     # skipped since the timing of the reference-call is very inconsistent
-    #time0 = time()  # call for reference
-    #_ = wait_for_report(
+    # time0 = time()  # call for reference
+    # _ = wait_for_report(
     #    demo_api, demo_api.demo({"demo": {"duration": 0}})
-    #).model_dump()
+    # ).model_dump()
     time1 = time()  # actual run
     _ = wait_for_report(
         demo_api, demo_api.demo({"demo": {"duration": 0.25}})
@@ -275,17 +272,19 @@ def test_sdk_demo_duration(demo_app, demo_client, run_service):
 
 
 @pytest.mark.skipif(not sdk_available, reason="missing dcm-demo-sdk")
-def test_sdk_demo_no_success(demo_app, demo_client, run_service):
+def test_sdk_demo_no_success(testing_config, demo_client, run_service):
     """
     Run test for demo-app nested jobs and different value for success.
     """
-    run_service(app=demo_app, port=8080)
-    run_service(app=demo_app, port=8081)
+    run_service(from_factory=lambda: app_factory(testing_config()), port=8080)
+    run_service(from_factory=lambda: app_factory(testing_config()), port=8081)
     demo_api: dcm_demo_sdk.DemoApi = demo_client("http://localhost:8080")
     token = demo_api.demo(
         {
             "demo": {
-                "success": True, "duration": 0, "children": [
+                "success": True,
+                "duration": 0,
+                "children": [
                     {
                         "host": "http://localhost:8081",
                         "body": {
@@ -293,9 +292,9 @@ def test_sdk_demo_no_success(demo_app, demo_client, run_service):
                                 "success": False,
                                 "duration": 0,
                             }
-                        }
+                        },
                     },
-                ]
+                ],
             }
         }
     )
@@ -305,19 +304,15 @@ def test_sdk_demo_no_success(demo_app, demo_client, run_service):
 
 
 @pytest.mark.skipif(not sdk_available, reason="missing dcm-demo-sdk")
-def test_sdk_demo_abort(demo_app, demo_client, run_service):
+def test_sdk_demo_abort(testing_config, demo_client, run_service):
     """Run test for abortion of running job."""
-    run_service(app=demo_app, port=8080)
+    run_service(from_factory=lambda: app_factory(testing_config()), port=8080)
     demo_api: dcm_demo_sdk.DemoApi = demo_client("http://localhost:8080")
-    token = demo_api.demo(
-        {
-            "demo": {"duration": 5}
-        }
-    )
+    token = demo_api.demo({"demo": {"duration": 5}})
     sleep(0.1)
     demo_api.abort(
         token.value,
-        abort_request={"origin": "pytest-runner", "reason": "test abort"}
+        abort_request={"origin": "pytest-runner", "reason": "test abort"},
     )
 
     report = wait_for_report(demo_api, token).model_dump()
@@ -327,16 +322,18 @@ def test_sdk_demo_abort(demo_app, demo_client, run_service):
     assert Context.ERROR.name in report["log"]
 
 
-def test_sdk_demo_abort_with_child(demo_app, demo_client, run_service):
+def test_sdk_demo_abort_with_child(testing_config, demo_client, run_service):
     """Run test for abortion of running job with child."""
-    run_service(app=demo_app, port=8080)
+    run_service(from_factory=lambda: app_factory(testing_config()), port=8080)
     demo_api: dcm_demo_sdk.DemoApi = demo_client("http://localhost:8080")
-    run_service(app=demo_app, port=8081)
+    run_service(from_factory=lambda: app_factory(testing_config()), port=8081)
     demo_api2: dcm_demo_sdk.DemoApi = demo_client("http://localhost:8081")
     token = demo_api.demo(
         {
             "demo": {
-                "success": True, "duration": 0, "children": [
+                "success": True,
+                "duration": 0,
+                "children": [
                     {
                         "host": "http://localhost:8081",
                         "body": {
@@ -344,16 +341,16 @@ def test_sdk_demo_abort_with_child(demo_app, demo_client, run_service):
                                 "success": False,
                                 "duration": 5,
                             }
-                        }
+                        },
                     },
-                ]
+                ],
             }
         }
     )
-    sleep(0.5)
+    sleep(1)
     demo_api.abort(
         token.value,
-        abort_request={"origin": "pytest-runner", "reason": "test abort"}
+        abort_request={"origin": "pytest-runner", "reason": "test abort"},
     )
 
     report = wait_for_report(demo_api, token).model_dump()
@@ -361,6 +358,13 @@ def test_sdk_demo_abort_with_child(demo_app, demo_client, run_service):
     assert report["progress"]["status"] == "aborted"
     assert report["data"]["success"] is None
     assert Context.ERROR.name in report["log"]
+
+    assert "Job aborted by" in str(report["log"])
+    assert "child-0@demo" in report["children"]
+    assert (
+        report["children"]["child-0@demo"]["progress"]["status"] == "aborted"
+    )
+    assert "Job aborted by" in str(report["children"]["child-0@demo"]["log"])
 
     token2 = re.match(
         r".*Got token '(.+)' from external service.*", str(report)
@@ -374,126 +378,9 @@ def test_sdk_demo_abort_with_child(demo_app, demo_client, run_service):
 
 
 @pytest.mark.skipif(not sdk_available, reason="missing dcm-demo-sdk")
-@pytest.mark.parametrize(
-    "success",
-    [True, False],
-    ids=["success", "no-success"]
-)
-def test_sdk_demo_abort_via_notification(
-    success, demo_client, run_service, testing_config
-):
-    """
-    Run test for abortion of running job by using other worker/
-    notification. This is done by
-    * running a notification service
-    * run the first instance of the demo-app
-    * submit a job and wait for it to start up
-    * run another instance of the demo-app
-    * abort via this second app
-
-    In case of `not success`, the timeout is set very low causing the
-    limit to be exceeded while calling the notification api.
-    """
-    # notifications
-    run_service(
-        app=notify_app_factory(
-            NativeKeyValueStoreAdapter(MemoryStore()),
-            topics={
-                "abort": Topic("/demo", HTTPMethod.DELETE, 200)
-            },
-            debug=True
-        ), port=5000
-    )
-    # first demo-app
-    testing_config.ORCHESTRATION_ABORT_NOTIFICATIONS = True
-    testing_config.ORCHESTRATION_ABORT_NOTIFICATIONS_URL = "http://localhost:5000"
-    testing_config.ORCHESTRATION_ABORT_NOTIFICATIONS_CALLBACK = "http://localhost:8080"
-    run_service(app=app_factory(testing_config(), as_process=True), port=8080)
-
-    demo_api: dcm_demo_sdk.DemoApi = demo_client("http://localhost:8080")
-    token = demo_api.demo(
-        {
-            "demo": {"duration": 5}
-        }
-    )
-    sleep(0.5)
-
-    # second demo-app
-    testing_config.ORCHESTRATION_ABORT_NOTIFICATIONS_CALLBACK = "http://localhost:8081"
-    if not success:
-        testing_config.ORCHESTRATION_ABORT_TIMEOUT = 0.0001
-    run_service(app=app_factory(testing_config(), as_process=True), port=8081)
-    demo_api2: dcm_demo_sdk.DemoApi = demo_client("http://localhost:8081")
-    if success:
-        demo_api2.abort(
-            token.value,
-            abort_request={"origin": "pytest-runner", "reason": "test abort"}
-        )
-
-        report = wait_for_report(demo_api, token).model_dump()
-
-        assert report["progress"]["status"] == "aborted"
-        assert report["data"]["success"] is None
-        assert Context.ERROR.name in report["log"]
-    else:
-        with pytest.raises(dcm_demo_sdk.exceptions.ApiException) as exc_info:
-            demo_api2.abort(
-                token.value,
-                abort_request={"origin": "pytest-runner", "reason": "test abort"}
-            )
-        assert "error while making abort-request" in exc_info.value.body
-        assert "timed out" in exc_info.value.body
-        assert exc_info.value.status == 502
-        demo_api.abort(  # actually abort job
-            token.value,
-            abort_request={"origin": "pytest-runner", "reason": "test abort"}
-        )
-
-
-def test_sdk_demo_abort_with_child_get_report_hook(
-    demo_app, demo_client, run_service
-):
-    """
-    Run test for abortion of running job with child and configured post-
-    abort abort hook for collecting the report.
-    """
-    run_service(app=demo_app, port=8080)
-    demo_api: dcm_demo_sdk.DemoApi = demo_client("http://localhost:8080")
-    run_service(app=demo_app, port=8081)
-    token = demo_api.demo(
-        {
-            "demo": {
-                "success": True, "duration": 0, "children": [
-                    {
-                        "host": "http://localhost:8081",
-                        "body": {
-                            "demo": {
-                                "success": False,
-                                "duration": 5,
-                            }
-                        }
-                    },
-                ]
-            }
-        }
-    )
-    sleep(0.5)
-    demo_api.abort(
-        token.value,
-        abort_request={"origin": "pytest-runner", "reason": "test abort"}
-    )
-
-    report = wait_for_report(demo_api, token).model_dump()
-    assert "SIGKILL" in str(report["log"])
-    assert "child-0@demo" in report["children"]
-    assert report["children"]["child-0@demo"]["progress"]["status"] == "aborted"
-    assert "SIGKILL" in str(report["children"]["child-0@demo"]["log"])
-
-
-@pytest.mark.skipif(not sdk_available, reason="missing dcm-demo-sdk")
-def test_sdk_demo_plugin(demo_app, demo_client, run_service):
+def test_sdk_demo_plugin(testing_config, demo_client, run_service):
     """Run test for demo-app with plugin-job."""
-    run_service(app=demo_app, port=8080)
+    run_service(from_factory=lambda: app_factory(testing_config()), port=8080)
     demo_api: dcm_demo_sdk.DemoApi = demo_client("http://localhost:8080")
     token = demo_api.demo(
         {
@@ -514,28 +401,18 @@ def test_sdk_demo_plugin(demo_app, demo_client, run_service):
 
 
 @pytest.mark.skipif(not sdk_available, reason="missing dcm-demo-sdk")
-def test_sdk_demo_submit_with_token(demo_app, demo_client, run_service):
+def test_sdk_demo_submit_with_token(testing_config, demo_client, run_service):
     """Run test for demo-app with minimal job and providing token."""
-    run_service(app=demo_app, port=8080)
+    run_service(from_factory=lambda: app_factory(testing_config()), port=8080)
     demo_api: dcm_demo_sdk.DemoApi = demo_client("http://localhost:8080")
     _token = str(uuid4())
-    token = demo_api.demo(
-        {
-            "demo": {"duration": 1},
-            "token": _token
-        }
-    )
+    token = demo_api.demo({"demo": {"duration": 1}, "token": _token})
     assert token.value == _token
     with pytest.raises(dcm_demo_sdk.ApiException) as exc_info:
         demo_api.get_report(token.value).progress.status
 
     # repeat submission (same token)
-    token = demo_api.demo(
-        {
-            "demo": {"duration": 1},
-            "token": _token
-        }
-    )
+    token = demo_api.demo({"demo": {"duration": 1}, "token": _token})
     assert token.value == _token
     with pytest.raises(dcm_demo_sdk.ApiException) as exc_info:
         demo_api.get_report(token.value).progress.status
@@ -543,12 +420,7 @@ def test_sdk_demo_submit_with_token(demo_app, demo_client, run_service):
     wait_for_report(demo_api, token).model_dump()
 
     # repeat again post-job (same token)
-    token = demo_api.demo(
-        {
-            "demo": {"duration": 1},
-            "token": _token
-        }
-    )
+    token = demo_api.demo({"demo": {"duration": 1}, "token": _token})
     assert token.value == _token
 
     # already completed
@@ -557,10 +429,5 @@ def test_sdk_demo_submit_with_token(demo_app, demo_client, run_service):
 
     # submission fails if configuration changed (same token)
     with pytest.raises(dcm_demo_sdk.ApiException) as exc_info:
-        demo_api.demo(
-            {
-                "demo": {"duration": 0},
-                "token": _token
-            }
-        )
+        demo_api.demo({"demo": {"duration": 0}, "token": _token})
     print(exc_info.value)

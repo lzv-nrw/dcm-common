@@ -11,7 +11,9 @@ import pytest
 import requests
 
 from dcm_common.db import (
-    key_value_store_app_factory, JSONFileStore, MemoryStore
+    key_value_store_app_factory,
+    JSONFileStore,
+    MemoryStore,
 )
 from dcm_common.services.tests.fixtures import run_service, external_service
 
@@ -45,11 +47,7 @@ def test_db_push(db: JSONFileStore, run_service):
     assert db.read(key) == "value1"
 
 
-@pytest.mark.parametrize(
-    "pop",
-    ["", "?pop="],
-    ids=["no-pop", "pop"]
-)
+@pytest.mark.parametrize("pop", ["", "?pop="], ids=["no-pop", "pop"])
 def test_db_get_key(pop, db: JSONFileStore, run_service):
     """Test /db/<key>-GET endpoint."""
     run_service(key_value_store_app_factory(db, "test-db"), port=8080)
@@ -68,11 +66,7 @@ def test_db_get_key(pop, db: JSONFileStore, run_service):
         assert response.status_code == 200
 
 
-@pytest.mark.parametrize(
-    "pop",
-    ["", "?pop="],
-    ids=["no-pop", "pop"]
-)
+@pytest.mark.parametrize("pop", ["", "?pop="], ids=["no-pop", "pop"])
 def test_db_get(pop, db: JSONFileStore, run_service):
     """Test /db-GET endpoint."""
     run_service(key_value_store_app_factory(db, "test-db"), port=8080)
@@ -145,22 +139,23 @@ def test_api(db: JSONFileStore, run_service):
 def test_high_load(run_service):
     """Test handling of concurrent requests."""
     run_service(
-        key_value_store_app_factory(MemoryStore(), "test-db"),
-        port=8080
+        key_value_store_app_factory(MemoryStore(), "test-db"), port=8080
     )
     nthreads = 100
     nmessages = 10
+
     def producer(index):
         def _(n):
             for task in range(n):
                 token = f"{index}.{task}"
                 requests.post(
-                    f"http://localhost:8080/db/{token}",
-                    json=token,
-                    timeout=1
+                    f"http://localhost:8080/db/{token}", json=token, timeout=1
                 )
+
         return _
+
     consumed = {}
+
     def consumer():
         def _():
             exit_counter = 0
@@ -176,7 +171,9 @@ def test_high_load(run_service):
                 json = response.json()
                 assert json["key"] == json["value"]
                 consumed[json["key"]] = json["value"]
+
         return _
+
     producers = [
         threading.Thread(target=producer(t), args=(nmessages,), daemon=True)
         for t in range(nthreads)

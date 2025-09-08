@@ -3,13 +3,22 @@ Base data-model definition
 """
 
 from typing import (
-    Optional, Callable, Any, TypeVar, Union, get_type_hints, get_args,
-    get_origin
+    Optional,
+    Callable,
+    Any,
+    TypeVar,
+    Union,
+    get_type_hints,
+    get_args,
+    get_origin,
 )
 from collections.abc import Mapping, MutableMapping
 
 from .jsonable import (
-    JSONable, JSONObject, is_jsonable_spec, is_jsonobject_spec
+    JSONable,
+    JSONObject,
+    is_jsonable_spec,
+    is_jsonobject_spec,
 )
 
 
@@ -23,6 +32,7 @@ def _handler(category: str, name: str, json_name: Optional[str] = None):
         Can be used to decorate `DataModel`-methods to append to class-
         attribute (de-)serialization handlers.
         """
+
         def __init__(self, handler):
             if not isinstance(handler, classmethod):
                 raise TypeError(
@@ -46,8 +56,9 @@ def _handler(category: str, name: str, json_name: Optional[str] = None):
                 setattr(owner, category, getattr(owner, category).copy())
             getattr(owner, category)[name] = (
                 name if json_name is None else json_name,
-                self.handler.__func__
+                self.handler.__func__,
             )
+
     return SerializationDescriptor
 
 
@@ -212,13 +223,11 @@ class DataModel:
         """Convert dictionary values into JSONable."""
         _json = {}
         for key, value in json.items():
-            if (
-                use_handlers and key in cls._serialization_handlers
-            ):
+            if use_handlers and key in cls._serialization_handlers:
                 try:
-                    _json[
-                        cls._serialization_handlers[key][0]
-                    ] = cls._serialization_handlers[key][1](cls, value)
+                    _json[cls._serialization_handlers[key][0]] = (
+                        cls._serialization_handlers[key][1](cls, value)
+                    )
                 except _DataModelDeSerializationSkipSignal:
                     pass
             elif (
@@ -227,11 +236,8 @@ class DataModel:
                 and key.startswith("_")
             ):
                 pass
-            elif (
-                isinstance(value, DataModel)
-                or (
-                    hasattr(value, "json") and not callable(value.json)
-                )
+            elif isinstance(value, DataModel) or (
+                hasattr(value, "json") and not callable(value.json)
             ):
                 _json[key] = value.json
             elif isinstance(value, MutableMapping):
@@ -251,7 +257,7 @@ class DataModel:
                         msg=f"Encountered non-supported attribute '{value}' "
                         + f"(type '{type(value).__name__}')",
                         key=key,
-                        model=cls.__name__
+                        model=cls.__name__,
                     )
                 )
         return _json
@@ -261,11 +267,8 @@ class DataModel:
         """Convert list elements into JSONable."""
         _json = []
         for value in json:
-            if (
-                isinstance(value, DataModel)
-                or (
-                    hasattr(value, "json") and not callable(value.json)
-                )
+            if isinstance(value, DataModel) or (
+                hasattr(value, "json") and not callable(value.json)
             ):
                 _json.append(value.json)
             elif isinstance(value, MutableMapping):
@@ -280,7 +283,7 @@ class DataModel:
                         msg=f"Encountered non-supported object '{value}' (type"
                         + f" {type(value).__name__})",
                         key=key,
-                        model=cls.__name__
+                        model=cls.__name__,
                     )
                 )
         return _json
@@ -297,25 +300,21 @@ class DataModel:
                     + f"(got type '{type(json).__name__}' but "
                     + f"expected type '{MutableMapping.__name__}')",
                     key="<root>",
-                    model=cls.__name__
+                    model=cls.__name__,
                 )
             )
 
         _json = {}
         for key, type_ in get_type_hints(
             cls,
-            localns=locals() | {"JSONable": JSONable, "JSONObject": JSONObject}
+            localns=locals()
+            | {"JSONable": JSONable, "JSONObject": JSONObject},
         ).items():
             if key in cls._deserialization_handlers:
                 try:
-                    _json[key] = (
-                        cls._deserialization_handlers[key][1](
-                            type_,
-                            json.get(
-                                cls._deserialization_handlers[key][0],
-                                None
-                            )
-                        )
+                    _json[key] = cls._deserialization_handlers[key][1](
+                        type_,
+                        json.get(cls._deserialization_handlers[key][0], None),
                     )
                 except _DataModelDeSerializationSkipSignal:
                     pass
@@ -330,9 +329,8 @@ class DataModel:
                 _json[key] = cls._from_json_object(key, json[key])
             elif isinstance(json[key], list):
                 _json[key] = cls._from_json_array(key, json[key])
-            elif (
-                json[key] is None
-                or isinstance(json[key], (str | int | float | bool))
+            elif json[key] is None or isinstance(
+                json[key], (str | int | float | bool)
             ):
                 _json[key] = json[key]
             else:
@@ -343,7 +341,7 @@ class DataModel:
                             + f"(got type '{type(json[key]).__name__}' but "
                             + f"expected type '{type_.__name__}')",
                             key=key,
-                            model=cls.__name__
+                            model=cls.__name__,
                         )
                     )
                 _json[key] = json[key]
@@ -362,7 +360,8 @@ class DataModel:
         # get type annotations with extended namespace
         type_ = get_type_hints(
             cls,
-            localns=locals() | {"JSONable": JSONable, "JSONObject": JSONObject}
+            localns=locals()
+            | {"JSONable": JSONable, "JSONObject": JSONObject},
         )[key]
 
         # plain DataModel annotation
@@ -406,9 +405,8 @@ class DataModel:
             type__ = None
 
         # check if the type is a primitive
-        if (
-            type__ is not None
-            and (type__ == Any or type__ in (str, int, float, bool))
+        if type__ is not None and (
+            type__ == Any or type__ in (str, int, float, bool)
         ):
             return json
         # no match > raise error
@@ -416,7 +414,7 @@ class DataModel:
             cls._DESERIALIZATION_ERR_MSG.format(
                 msg=f"Encountered incompatible typehint '{type_}'",
                 key=key,
-                model=cls.__name__
+                model=cls.__name__,
             )
         )
 
@@ -427,9 +425,8 @@ class DataModel:
             type_ = get_args(
                 get_type_hints(
                     cls,
-                    localns=locals() | {
-                        "JSONable": JSONable, "JSONObject": JSONObject
-                    }
+                    localns=locals()
+                    | {"JSONable": JSONable, "JSONObject": JSONObject},
                 )[key]
             )[0]
         except IndexError:
@@ -442,7 +439,7 @@ class DataModel:
                     msg="Encountered a parameterized type (e.g., union) in a "
                     + "list",
                     key=key,
-                    model=cls.__name__
+                    model=cls.__name__,
                 )
             )
         result = []
@@ -452,7 +449,7 @@ class DataModel:
                     cls._DESERIALIZATION_ERR_MSG.format(
                         msg="Encountered a list of lists",
                         key=key,
-                        model=cls.__name__
+                        model=cls.__name__,
                     )
                 )
             if isinstance(item, MutableMapping):
@@ -461,7 +458,7 @@ class DataModel:
                         cls._DESERIALIZATION_ERR_MSG.format(
                             msg="Encountered an unexpected object in list",
                             key=key,
-                            model=cls.__name__
+                            model=cls.__name__,
                         )
                     )
                 result.append(type_.from_json(item))
@@ -526,33 +523,21 @@ def get_model_serialization_test(
                 _json = _instance.json
             except ValueError as exc_info:
                 problems.append(
-                    (
-                        i,
-                        target,
-                        f"Unable to serialize ({exc_info})."
-                    )
+                    (i, target, f"Unable to serialize ({exc_info}).")
                 )
                 continue
             try:
                 json.dumps(_json)
             except TypeError as exc_info:
                 problems.append(
-                    (
-                        i,
-                        target,
-                        f"Serialization incomplete ({exc_info})."
-                    )
+                    (i, target, f"Serialization incomplete ({exc_info}).")
                 )
                 continue
             try:
                 __instance = model.from_json(_json)
             except ValueError as exc_info:
                 problems.append(
-                    (
-                        i,
-                        target,
-                        f"Unable to deserialize ({exc_info})."
-                    )
+                    (i, target, f"Unable to deserialize ({exc_info}).")
                 )
                 continue
             try:
@@ -562,7 +547,7 @@ def get_model_serialization_test(
                             i,
                             target,
                             "Lost information during serialization-"
-                            + "deserialization-cycle."
+                            + "deserialization-cycle.",
                         )
                     )
                     continue
@@ -571,7 +556,7 @@ def get_model_serialization_test(
                     (
                         i,
                         target,
-                        f"Model incompatible with this test ({exc_info})"
+                        f"Model incompatible with this test ({exc_info})",
                     )
                 )
                 continue
@@ -581,7 +566,7 @@ def get_model_serialization_test(
                         i,
                         target,
                         "Lost information during serialization-"
-                        + "deserialization-cycle."
+                        + "deserialization-cycle.",
                     )
                 )
         assert not problems, _format_problems(problems)

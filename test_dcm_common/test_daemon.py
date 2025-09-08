@@ -110,13 +110,15 @@ def test_cdaemon_run_unrecoverable_error():
     Test behavior of `run`-loop of class `CDaemon` if unrecoverable
     error occurs.
     """
+
     def _broken_restart_service():
         raise RuntimeError("Some error occurred.")
+
     interval = 0.01
     d = CDaemon(target=lambda: sleep(1), daemon=True)
     with patch(
         "dcm_common.daemon.CDaemon._restart_service",
-        side_effect=_broken_restart_service
+        side_effect=_broken_restart_service,
     ):
         d.run(interval, False, False)
     sleep(interval)
@@ -127,6 +129,7 @@ def test_cdaemon_stop_quick():
     """
     Test method `stop` of class `CDaemon` for long interval.
     """
+
     def _service():
         while True:
             sleep(0.01)
@@ -154,6 +157,7 @@ def test_fdaemon_minimal():
             result["data"] += 1
             while True:
                 sleep(interval)
+
         return Thread(target=_service, daemon=True)
 
     d = FDaemon(_factory)
@@ -177,6 +181,7 @@ def test_fdaemon_reconfigure():
             while not stop.is_set():
                 sleep(interval)
             stopped.set()
+
         return Thread(target=_service, daemon=True)
 
     d = FDaemon(_factory, kwargs={"increment": 1})
@@ -193,11 +198,7 @@ def test_fdaemon_reconfigure():
     d.stop(True)
 
 
-@pytest.mark.parametrize(
-    "block",
-    [True, False],
-    ids=["block", "no-block"]
-)
+@pytest.mark.parametrize("block", [True, False], ids=["block", "no-block"])
 def test_fdaemon_run_block(block):
     """
     Test argument `block` for method `run` of class `FDaemon`.
@@ -208,9 +209,11 @@ def test_fdaemon_run_block(block):
     interval = 0.01
 
     def _factory():
-        sleep(2*interval)
+        sleep(2 * interval)
+
         def _service():
-            sleep(10*interval)
+            sleep(10 * interval)
+
         return Thread(target=_service, daemon=True)
 
     d = FDaemon(_factory)

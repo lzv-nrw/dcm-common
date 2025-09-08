@@ -3,7 +3,7 @@ This package provides common functions and components for the [`Digital Curation
 This includes:
 * `db`: database implementations and adapter definitions,
 * `models`: data-model interface and common models,
-* `orchestration`: job orchestration-system,
+* `orchestra`: job orchestration-system,
 * `plugins`: an interface and optional extensions for a general plugin-system,
 * `services`: various general and dcm-specific components for the definition of Flask-based web-applications
 * `daemon`: background-process utility,
@@ -27,8 +27,8 @@ These can be installed by entering `pip install ".[services]"`.
 The `db`-subpackage imposes additional requirements.
 These can be installed using `pip install ".[db]"`.
 
-#### Orchestration
-The `orchestration`-extra shares its additional requirements with the `db`-extra due to its dependence on the `db`-subpackage.
+#### orchestra
+The `orchestra`-extra has additional requirements which can be installed with `pip install ".[orchestra]"`.
 
 #### xml
 The `xml`-subpackage imposes additional requirements.
@@ -51,24 +51,39 @@ Requires extra `services`.
 * `ALLOW_CORS` [DEFAULT 0]: have flask-app allow cross-origin-resource-sharing; needed for hosting swagger-ui with try-it functionality
 
 #### OrchestratedAppConfig - Environment/Configuration
-* `ORCHESTRATION_PROCESSES` [DEFAULT 1]: maximum number of simultaneous job processes
-* `ORCHESTRATION_AT_STARTUP` [DEFAULT 1]: whether orchestration-loop is automatically started with app
-* `ORCHESTRATION_TOKEN_EXPIRATION` [DEFAULT 1]: whether job tokens (and their associated info like report) expire
-* `ORCHESTRATION_TOKEN_DURATION` [DEFAULT 3600]: time until job token expires in seconds
-* `ORCHESTRATION_DEBUG` [DEFAULT 0]: whether to have orchestrator print debug-information
-* `ORCHESTRATION_CONTROLS_API` [DEFAULT 0]: whether the orchestration-controls API is available
-* `ORCHESTRATION_QUEUE_ADAPTER` [DEFAULT "native"]: which adapter-type to use for the queue
-* `ORCHESTRATION_REGISTRY_ADAPTER`: same as `ORCHESTRATION_QUEUE_ADAPTER` for registry-adapter
-* `ORCHESTRATION_QUEUE_SETTINGS` [DEFAULT {"backend": "memory"}]: JSON object containing the relevant information for initializing the adapter
-  * "backend": "disk" | "memory",
-  * kwargs expected/accepted by the selected adapter/backend (like "dir", "url", "timeout", ...; see `db`-package docs for more information)
-* `ORCHESTRATION_REGISTRY_SETTINGS`: same as `ORCHESTRATION_QUEUE_SETTINGS` for registry-adapter
-* `ORCHESTRATION_DAEMON_INTERVAL` [DEFAULT None]: time in seconds between each iteration of the orchestrator daemon
-* `ORCHESTRATION_ORCHESTRATOR_INTERVAL` [DEFAULT None]: time in seconds between each iteration of the orchestrator
-* `ORCHESTRATION_ABORT_NOTIFICATIONS` [DEFAULT 0]: whether the Notification API is used for job abortion (only relevant in parallel deployment)
-* `ORCHESTRATION_ABORT_NOTIFICATIONS_URL` [DEFAULT None]: Notification API url (only relevant in parallel deployment)
-* `ORCHESTRATION_ABORT_NOTIFICATIONS_CALLBACK` [DEFAULT None]: base-url at which abortion requests are made to from a broadcast of the Notification API (only relevant in parallel deployment)
-* `ORCHESTRATION_ABORT_TIMEOUT` [DEFAULT 1.0]: timeout duration for notify-requests to the Notification API (only relevant in parallel deployment)
+* `ORCHESTRA_WORKER_POOL_SIZE` [DEFAULT 1]: number of simultaneous worker threads
+* `ORCHESTRA_AT_STARTUP` [DEFAULT 1]: whether to start worker pool immediately
+* `ORCHESTRA_WORKER_INTERVAL` [DEFAULT 1]: worker-loop interval/interval between queue-polls
+* `ORCHESTRA_DAEMON_INTERVAL` [DEFAULT 1]: interval for orchestra-daemon
+* `ORCHESTRA_CONTROLLER` [DEFAULT "sqlite"]: controller type; possible values
+  * `sqlite`: uses a SQLite3-database (in-memory or persistent)
+  * `http`: connects to an orchestra-controller-API via HTTP
+* `ORCHESTRA_CONTROLLER_ARGS` [DEFAULT "{}"]: additional controller arguments passed to the constructor as JSON
+  * `sqlite`: the SQLite-controller supports the following arguments
+    * `path`: path to a SQLite-database file
+    * `memory_id`: identifier for a shared in-memory database
+    * `name`: optional name tag for this controller (used in logging)
+    * `requeue`: whether to requeue jobs that have failed
+    * `lock_ttl`: time to live for a lock on a job in the job registry
+    * `token_ttl`: time to live for a record in the job registry (null corresponds to no expiration)
+    * `message_ttl`: time to live for a message (null corresponds to no expiration)
+    * `timeout`: timeout duration for creating a database connection in seconds (mostly relevant for concurrency)
+  * `http`: the HTTP-controller supports the following arguments
+    * `base_url`: base url for controller API
+    * `timeout`: request timeout in seconds
+    * `name`: optional name tag for this controller (used in logging)
+    * `max_retries`: number of retries if an HTTP-error occurs during a request
+    * `retry_interval`: interval between retries in seconds
+    * `request_kwargs`: additional kwargs that are passed when calling `requests.request`
+* `ORCHESTRA_WORKER_ARGS` [DEFAULT "{}"]: additional worker arguments passed to the constructor as JSON
+  * `name`: optional name tag for this worker (used in logging)
+  * `process_timeout`: timeout for individual jobs in seconds; exceeding this value causes the worker to abort execution
+  * `registry_push_interval`: interval for pushes of job results to the registry in seconds
+  * `lock_refresh_interval`: interval for refreshes of locks on jobs in queue in seconds
+  * `message_interval`: interval for the message-polling in seconds
+* `ORCHESTRA_ABORT_TIMEOUT` [DEFAULT 30]: duration until a timeout-request times out
+* `ORCHESTRA_LOGLEVEL` [DEFAULT "info"]: loglevel for components of the `orchestra`-package; possible values are "none", "error", "info", and "debug"
+* `ORCHESTRA_MP_METHOD` [DEFAULT "spawn"]: method for creating child processes; see [discussion](https://discuss.python.org/t/concerns-regarding-deprecation-of-fork-with-alive-threads/33555/4)
 
 #### FSConfig - Environment/Configuration
 In addition to the `BaseConfig`-environment settings, the `FSConfig` introduces the following
@@ -114,7 +129,7 @@ The implementation is organized in multiple subpackages:
   * `http`: network-database (like the flask-middleware provided here) that implements the 'LZV.nrw - KeyValueStore-API'
 
 ### SQL-adapter implementation
-The implementation contains the definition of a common interface and two adapters for PostgreSQL (`PostgreSQLAdapterSQL14`, based on the `psycopg3`-package) and SQLite (`SQLiteAdapter3`, based on the standard library package `sqlite3`) databases.
+The implementation contains the definition of a common interface and two adapters for PostgreSQL (`PostgreSQLAdapter14`, based on the `psycopg3`-package) and SQLite (`SQLiteAdapter3`, based on the standard library package `sqlite3`) databases.
 
 Both adapters implement connection pooling and caching of basic database-schema information for methods like `get_table_names`.
 The cache-size can be controlled with `DB_ADAPTER_SCHEMA_CACHE_SIZE` (default 64).

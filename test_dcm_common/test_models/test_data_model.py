@@ -13,6 +13,7 @@ from dcm_common.models.data_model import get_model_serialization_test
 
 def test_json_minimal():
     """Test property `json` of class `DataModel`."""
+
     class Model(DataModel):
         def __init__(self, p1: str, p2: int):
             self.p1 = p1
@@ -23,6 +24,7 @@ def test_json_minimal():
 
 def test_json_minimal_dataclass():
     """Test property `json` of class `DataModel`."""
+
     @dataclass
     class Model(DataModel):
         p1: str
@@ -35,6 +37,7 @@ def test_json_private_attributes():
     """
     Test property `json` of class `DataModel` for private attributes.
     """
+
     class Model(DataModel):
         def __init__(self, p1):
             self.p1 = p1
@@ -47,6 +50,7 @@ def test_json_private_attributes_dataclass():
     """
     Test property `json` of class `DataModel` for private attributes.
     """
+
     @dataclass
     class Model(DataModel):
         p1: str
@@ -57,6 +61,7 @@ def test_json_private_attributes_dataclass():
 
 def test_json_missing_attributes():
     """Test property `json` of class `DataModel`."""
+
     class Model(DataModel):
         def __init__(self, p1: str, p2: int):
             self.p1 = p1
@@ -67,6 +72,7 @@ def test_json_missing_attributes():
 
 def test_json_inheritance():
     """Test property `json` of class `DataModel` with inheritance."""
+
     class BaseModel(DataModel):
         def __init__(self, p1: str, p2: int):
             self.p1 = p1
@@ -86,6 +92,7 @@ def test_json_bad_handler():
     handler for a `DataModel`-class.
     """
     with pytest.raises(TypeError):
+
         @dataclass
         class Model(DataModel):
             p: int
@@ -101,14 +108,17 @@ def test_json_override():
     Test overriding serialization of field in property `json` of class
     `DataModel`.
     """
+
     @dataclass
     class Model1(DataModel):
         """Base - None will be omitted in serialization"""
+
         p: Optional[int]
 
     @dataclass
     class Model2(DataModel):
         """Override default behavior for None via handler"""
+
         p: Optional[int]
 
         @DataModel.serialization_handler("p")
@@ -119,6 +129,7 @@ def test_json_override():
     @dataclass
     class Model3(DataModel):
         """Change serialized name via handler"""
+
         p: int
 
         @DataModel.serialization_handler("p", "_p")
@@ -129,6 +140,7 @@ def test_json_override():
     @dataclass
     class Model4(DataModel):
         """Override default behavior for private attribute via handler"""
+
         _p: int
 
         @DataModel.serialization_handler("_p", "p")
@@ -147,6 +159,7 @@ def test_json_error():
     Test serialization via property `json` with non-serializable field
     of class `DataModel`.
     """
+
     class Model(DataModel):
         def __init__(self, p):
             self.p = p
@@ -160,6 +173,7 @@ def test_json_error_patch():
     Test serialization via property `json` with non-serializable field
     of class `DataModel`; patched via handler.
     """
+
     class Model(DataModel):
         def __init__(self, p):
             self.p = p
@@ -176,6 +190,7 @@ def test_json_nested():
     """
     Test property `json` of class `DataModel` with nested structure.
     """
+
     class InnerModel(DataModel):
         def __init__(self, q: int):
             self.q = q
@@ -193,6 +208,7 @@ def test_json_nested_handler_conflicting_names():
     Test property `json` of class `DataModel` with nested structure and
     name conflict with Mapping and outer model-handler.
     """
+
     @dataclass
     class Model(DataModel):
         p: dict[str, int]
@@ -213,6 +229,7 @@ def test_json_nested_dataclass():
     Test property `json` of class `DataModel` with nested structure and
     dataclasses.
     """
+
     @dataclass
     class InnerModel(DataModel):
         q: int
@@ -231,6 +248,7 @@ def test_json_skip_via_handler():
     Test property `json` of class `DataModel` with handler and
     `DataModel.skip`-signal.
     """
+
     @dataclass
     class Model(DataModel):
         p: int
@@ -251,6 +269,7 @@ def test_json_dictionary_with_none_value():
     Test property `json` of class `DataModel` with a dictionary
     containing `None`-values.
     """
+
     @dataclass
     class Model(DataModel):
         p: dict
@@ -263,6 +282,7 @@ def test_json_dictionary_with_underscore_in_key():
     Test property `json` of class `DataModel` with a dictionary
     containing keys with leading underscore.
     """
+
     @dataclass
     class Model(DataModel):
         p: dict
@@ -275,6 +295,7 @@ def test_json_dictionary_with_non_string_key():
     Test property `json` of class `DataModel` with a dictionary
     containing non-string keys.
     """
+
     @dataclass
     class Model(DataModel):
         p: dict
@@ -284,9 +305,11 @@ def test_json_dictionary_with_non_string_key():
 
 def test_from_json_minimal():
     """Test method `from_json` of class `DataModel`."""
+
     class Model(DataModel):
         p1: str
         p2: int
+
         def __init__(self, p1, p2):
             self.p1 = p1
             self.p2 = p2
@@ -296,6 +319,7 @@ def test_from_json_minimal():
 
 def test_from_json_minimal_dataclass():
     """Test method `from_json` of class `DataModel`."""
+
     @dataclass
     class Model(DataModel):
         p1: str
@@ -306,6 +330,7 @@ def test_from_json_minimal_dataclass():
 
 def test_from_json_bad_value():
     """Test method `from_json` of class `DataModel` for bad input."""
+
     @dataclass
     class Model(DataModel):
         p: str
@@ -318,8 +343,10 @@ def test_from_json_with_default():
     """
     Test method `from_json` of class `DataModel` with default value.
     """
+
     class Model(DataModel):
         p: int = 5
+
         def __init__(self, p):
             self.p = p
 
@@ -330,6 +357,7 @@ def test_from_json_with_default_dataclass():
     """
     Test method `from_json` of class `DataModel` with default value.
     """
+
     @dataclass
     class Model(DataModel):
         p: int = 5
@@ -342,8 +370,10 @@ def test_from_json_incomplete_annotation():
     Test method `from_json` of class `DataModel` for model without
     attribute annotation.
     """
+
     class Model(DataModel):
         p = None
+
         def __init__(self, p):
             self.p = p
 
@@ -357,6 +387,7 @@ def test_from_json_missing_annotation():
     Test method `from_json` of class `DataModel` for model without
     attribute annotation.
     """
+
     class Model(DataModel):
         def __init__(self, p):
             self.p = p
@@ -371,8 +402,10 @@ def test_from_json_optional():
     Test method `from_json` of class `DataModel` with optional
     attribute.
     """
+
     class Model(DataModel):
         p: Optional[str]
+
         def __init__(self, p):
             self.p = p
 
@@ -384,6 +417,7 @@ def test_from_json_optional_dataclass():
     Test method `from_json` of class `DataModel` with optional
     attribute.
     """
+
     @dataclass
     class Model(DataModel):
         p: Optional[str]
@@ -395,8 +429,10 @@ def test_from_json_any():
     """
     Test method `from_json` of class `DataModel` with any attribute.
     """
+
     class Model(DataModel):
         p: Any
+
         def __init__(self, p):
             self.p = p
 
@@ -409,6 +445,7 @@ def test_from_json_any_dataclass():
     """
     Test method `from_json` of class `DataModel` with any attribute.
     """
+
     @dataclass
     class Model(DataModel):
         p: Any
@@ -422,11 +459,13 @@ def test_from_json_list():
     """
     Test method `from_json` of class `DataModel` with list attribute.
     """
+
     class Model(DataModel):
         p1: list
         p2: list[str]
         p3: list[Any]
         p4: Optional[list]
+
         def __init__(self, p1, p2, p3, p4):
             self.p1 = p1
             self.p2 = p2
@@ -443,8 +482,10 @@ def test_from_json_list_error():
     """
     Test method `from_json` of class `DataModel` with list attribute.
     """
+
     class Model(DataModel):
         p: list[list]
+
         def __init__(self, p):
             self.p = p
 
@@ -456,9 +497,11 @@ def test_from_json_dict():
     """
     Test method `from_json` of class `DataModel` with list attribute.
     """
+
     class Model(DataModel):
         p1: dict[str, Any]
         p2: dict[str, int]
+
         def __init__(self, p1, p2):
             self.p1 = p1
             self.p2 = p2
@@ -475,12 +518,16 @@ def test_from_json_dict_error():
     """
     Test method `from_json` of class `DataModel` with list attribute.
     """
+
     class Model1(DataModel):
         p: dict
+
         def __init__(self, p):
             self.p = p
+
     class Model2(DataModel):
         p: dict[str, dict]
+
         def __init__(self, p):
             self.p = p
 
@@ -494,13 +541,16 @@ def test_from_json_nested_object_basic():
     """
     Test method `from_json` of class `DataModel` for nested models.
     """
+
     class InnerModel(DataModel):
         q: int
+
         def __init__(self, q):
             self.q = q
 
     class Model(DataModel):
         p: InnerModel
+
         def __init__(self, p: InnerModel):
             self.p = p
 
@@ -514,13 +564,16 @@ def test_from_json_nested_object_list():
     """
     Test method `from_json` of class `DataModel` for nested models.
     """
+
     class InnerModel(DataModel):
         q: int
+
         def __init__(self, q):
             self.q = q
 
     class Model(DataModel):
         p: list[InnerModel]
+
         def __init__(self, p):
             self.p = p
 
@@ -534,13 +587,16 @@ def test_from_json_nested_object_list_error():
     """
     Test method `from_json` of class `DataModel` for nested models.
     """
+
     class InnerModel(DataModel):
         q: int
+
         def __init__(self, q):
             self.q = q
 
     class Model(DataModel):
         p: list[dict[str, InnerModel]]
+
         def __init__(self, p):
             self.p = p
 
@@ -552,13 +608,16 @@ def test_from_json_nested_object_dict():
     """
     Test method `from_json` of class `DataModel` for nested models.
     """
+
     class InnerModel(DataModel):
         q: int
+
         def __init__(self, q):
             self.q = q
 
     class Model(DataModel):
         p: dict[str, InnerModel]
+
         def __init__(self, p):
             self.p = p
 
@@ -574,6 +633,7 @@ def test_from_json_nested_optional_datamodel():
     """
     Test method `from_json` of class `DataModel` for nested models.
     """
+
     @dataclass
     class InnerModel(DataModel):
         q: int
@@ -584,22 +644,16 @@ def test_from_json_nested_optional_datamodel():
 
     assert (
         Model(InnerModel(1)).json
-        == Model.from_json(
-            Model(InnerModel(1)).json
-        ).json
+        == Model.from_json(Model(InnerModel(1)).json).json
     )
-    assert (
-        Model().json
-        == Model.from_json(
-            Model().json
-        ).json
-    )
+    assert Model().json == Model.from_json(Model().json).json
 
 
 def test_from_json_nested_union_datamodel():
     """
     Test method `from_json` of class `DataModel` for union of models.
     """
+
     @dataclass
     class InnerModel1(DataModel):
         q: int
@@ -621,29 +675,29 @@ def test_from_json_optional_jsonobject():
     """
     Test method `from_json` of class `DataModel` for optional JSONObject.
     """
+
     @dataclass
     class Model(DataModel):
         p: Optional[JSONObject] = None
 
-    assert (
-        Model().json == Model.from_json(Model().json).json
-    )
-    assert (
-        Model({"p": {}}).json == Model.from_json(Model({"p": {}}).json).json
-    )
+    assert Model().json == Model.from_json(Model().json).json
+    assert Model({"p": {}}).json == Model.from_json(Model({"p": {}}).json).json
 
 
 def test_from_json_nested_object_dict_error():
     """
     Test method `from_json` of class `DataModel` for nested models.
     """
+
     class InnerModel(DataModel):
         q: int
+
         def __init__(self, q):
             self.q = q
 
     class Model(DataModel):
         p: dict[str, list[InnerModel]]
+
         def __init__(self, p):
             self.p = p
 
@@ -656,6 +710,7 @@ def test_from_json_nested_handler_conflicting_names():
     Test method `from_json` of class `DataModel` with nested structure
     and name conflict with Mapping and outer model-handler.
     """
+
     @dataclass
     class Model(DataModel):
         p: dict[str, int]
@@ -673,15 +728,18 @@ def test_from_json_nested_handler_conflicting_names():
 
 def test_from_json_inheritance():
     """Test method `from_json` of class `DataModel` with inheritance."""
+
     class BaseModel(DataModel):
         p1: str
         p2: int
+
         def __init__(self, p1, p2):
             self.p1 = p1
             self.p2 = p2
 
     class Model(BaseModel):
         p3: bool
+
         def __init__(self, p1, p2, p3):
             super().__init__(p1, p2)
             self.p3 = p3
@@ -697,6 +755,7 @@ def test_from_json_handler():
     Test overriding deserialization of field in method `from_json` of
     class `DataModel`.
     """
+
     @dataclass
     class Model1(DataModel):
         p: int
@@ -719,6 +778,7 @@ def test_from_json_error_handler_patch():
     Test overriding deserialization of field in method `from_json` of
     class `DataModel` to patch problematic property.
     """
+
     @dataclass
     class Model1(DataModel):
         p: list[list[int]]
@@ -734,10 +794,9 @@ def test_from_json_error_handler_patch():
 
     with pytest.raises(ValueError):
         _ = Model1.from_json({"p": [[0, 1], [2, 3]]})
-    assert (
-        Model2.from_json({"p": [[0, 1], [2, 3]]}).json
-        == {"p": [[0, 1], [2, 3]]}
-    )
+    assert Model2.from_json({"p": [[0, 1], [2, 3]]}).json == {
+        "p": [[0, 1], [2, 3]]
+    }
 
 
 def test_from_json_skip_via_handler():
@@ -745,6 +804,7 @@ def test_from_json_skip_via_handler():
     Test skipping value in method `from_json` of class `DataModel` with
     handler and `DataModel.skip`-signal.
     """
+
     @dataclass
     class Model(DataModel):
         p: int = 0
@@ -764,6 +824,7 @@ def test_from_json_omitted_field_with_handler():
     """
     Test KeyError when deserializing omitted field via handler.
     """
+
     @dataclass
     class Model(DataModel):
         p: Optional[int] = None
@@ -784,6 +845,7 @@ def test_json_from_json_attribute_renaming_datamodel_type():
     """
     Test renaming `DataModel`-type attribute via handler.
     """
+
     @dataclass
     class InnerModel(DataModel):
         p: int
@@ -817,8 +879,8 @@ def test_json_from_json_attribute_renaming_datamodel_type():
             return self._id
 
     assert (
-        Model(InnerModel(1)).json ==
-        Model.from_json(Model(InnerModel(1)).json).json
+        Model(InnerModel(1)).json
+        == Model.from_json(Model(InnerModel(1)).json).json
     )
     assert isinstance(
         Model.from_json(Model(InnerModel(1)).json).id, InnerModel
@@ -827,14 +889,12 @@ def test_json_from_json_attribute_renaming_datamodel_type():
 
 def test_json_from_json_parameterized_generic():
     """Test support for `DataModel`-type with parameterized generic."""
+
     @dataclass
     class Model(DataModel):
         p: str | dict[str, str]
 
-    assert (
-        Model("a").json ==
-        Model.from_json(Model("a").json).json
-    )
+    assert Model("a").json == Model.from_json(Model("a").json).json
 
 
 def test_json_from_json_jsonable_jsonobject():
@@ -842,14 +902,15 @@ def test_json_from_json_jsonable_jsonobject():
     Test error-handling for `DataModel`-type with parameterized generics
     JSONable and JSONObject.
     """
+
     @dataclass
     class Model(DataModel):
         p1: JSONable
         p2: JSONObject
 
     assert (
-        Model("a", {"b": 0}).json ==
-        Model.from_json(Model("a", {"b": 0}).json).json
+        Model("a", {"b": 0}).json
+        == Model.from_json(Model("a", {"b": 0}).json).json
     )
 
 
@@ -858,8 +919,10 @@ def test_json_from_json_handlers_inheritance_same_name():
     Test inheritance of (de-)serialization handlers of class
     `DataModel` for identical class scope+name.
     """
+
     class Model(DataModel):
         p: int
+
         def __init__(self, p):
             self.p = p
 
@@ -891,6 +954,7 @@ def test_json_from_json_handlers_inheritance():
 
     class BaseModel(DataModel):
         p: int
+
         def __init__(self, p):
             self.p = p
 
@@ -919,6 +983,7 @@ def test_json_from_json_handlers_inheritance_dataclass():
     Test inheritance of (de-)serialization handlers of class
     `DataModel` with dataclasses.
     """
+
     @dataclass
     class BaseModel(DataModel):
         p: int
@@ -954,7 +1019,7 @@ test_get_model_serialization_test_param_sets = get_model_serialization_test(
         ((), {"p": "a"}),
         ((), {"p": None}),
         ((), {}),
-    )
+    ),
 )
 
 
@@ -966,5 +1031,5 @@ test_get_model_serialization_test_instances = get_model_serialization_test(
         _Model(p="a"),
         _Model(p=None),
         _Model(),
-    )
+    ),
 )

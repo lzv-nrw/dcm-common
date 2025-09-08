@@ -61,4 +61,4 @@ def test_keys(mkvs: MemoryStore):
     """Test method `keys` of class `MemoryStore`."""
     assert mkvs.keys() == ()
     mkvs.write("key", "value")
-    assert mkvs.keys() == ("key", )
+    assert mkvs.keys() == ("key",)
