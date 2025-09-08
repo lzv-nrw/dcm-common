@@ -5,6 +5,7 @@ Test module for the Demo Service API.
 from time import time, sleep
 import re
 from uuid import uuid4
+from json import loads
 
 import pytest
 
@@ -339,7 +340,7 @@ def test_sdk_demo_abort_with_child(testing_config, demo_client, run_service):
                         "body": {
                             "demo": {
                                 "success": False,
-                                "duration": 5,
+                                "duration": 10,
                             }
                         },
                     },
@@ -347,7 +348,23 @@ def test_sdk_demo_abort_with_child(testing_config, demo_client, run_service):
             }
         }
     )
-    sleep(1)
+
+    # wait until child is started by polling for report and checking
+    # children
+    time0 = time()
+    while time() - time0 < 5:
+        try:
+            report = demo_api.get_report(token.value).model_dump()
+        except dcm_demo_sdk.exceptions.ApiException as exc_info:
+            report = loads(exc_info.data)
+        if report.get("children", {}).get("child-0@demo") is not None:
+            break
+        sleep(0.05)
+    assert (
+        report.get("children", {}).get("child-0@demo") is not None
+    ), "missing child, consider increasing maximum wait duration for this test"
+    assert "child-0@demo" in report["children"]
+
     demo_api.abort(
         token.value,
         abort_request={"origin": "pytest-runner", "reason": "test abort"},
@@ -360,7 +377,6 @@ def test_sdk_demo_abort_with_child(testing_config, demo_client, run_service):
     assert Context.ERROR.name in report["log"]
 
     assert "Job aborted by" in str(report["log"])
-    assert "child-0@demo" in report["children"]
     assert (
         report["children"]["child-0@demo"]["progress"]["status"] == "aborted"
     )

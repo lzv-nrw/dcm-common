@@ -1,4 +1,4 @@
-"""Definition of an http-based `orchestra.Controller`."""
+"""Definition of a sqlite-based `orchestra.Controller`."""
 
 from typing import Optional, Any, Mapping
 import sys
@@ -112,9 +112,12 @@ class Transaction:
 class SQLiteController(Controller):
     """
     Orchestra-Controller that works on a SQLite3-database. This class
-    is compatible with `threading` via a controller-locks when used as
+    is compatible with `threading` via a threading-lock when used as
     in-memory controller. For `multiprocessing`-support (and equivalent)
     the persistent mode is required (using the `path`-argument).
+
+    This is a duplicate of the implementation for the sqlite-based
+    key-value-store.
 
     Keyword arguments:
     path -- path to a SQLite-database file

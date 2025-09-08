@@ -1,6 +1,7 @@
 from .key_value_store.backend.interface import KeyValueStore
 from .key_value_store.backend.memory import MemoryStore
 from .key_value_store.backend.disk import JSONFileStore
+from .key_value_store.backend.sqlite import SQLiteStore
 from .key_value_store.middleware.flask.factory import (
     app_factory as key_value_store_app_factory,
     bp_factory as key_value_store_bp_factory,
@@ -62,6 +63,7 @@ __all__ = [
     "KeyValueStore",
     "MemoryStore",
     "JSONFileStore",
+    "SQLiteStore",
     "key_value_store_app_factory",
     "key_value_store_bp_factory",
     "KeyValueStoreAdapter",

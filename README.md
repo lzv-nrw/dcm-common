@@ -113,6 +113,7 @@ The implementation is organized in multiple subpackages:
   * `memory`: in-memory implementation without persistent data
   * `disk`: implementation that persists its data onto disk (in a working
     directory)
+  * `sqlite`: SQLite3-based implementation with support for threading
 * `middleware`: provides creation of flask-apps (factory pattern) that implements the 'LZV.nrw - KeyValueStore-API' using a `backend`-component
 
   Running this app provides a shared database for multiple clients (ensures correct handling of concurrency).

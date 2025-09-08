@@ -1,5 +1,11 @@
 # Changelog
 
+## [4.1.0] - 2025-09-08
+
+### Added
+
+- added SQLite-based implementation of a `KeyValueStore`
+
 ## [4.0.0] - 2025-09-08
 
 ### Changed
