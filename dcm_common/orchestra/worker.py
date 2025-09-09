@@ -276,7 +276,7 @@ class Worker:
             except Exception as exc_info_inner:
                 Logging.print_to_log(
                     "An exception occurred while handling an exception in "
-                    + f"child process(PID {pid}) for job "
+                    + f"child process (PID {pid}) for job "
                     + f"'{process_context.info.token.value}': "
                     + str(exc_info_inner),
                     Logging.LEVEL_ERROR,
@@ -537,7 +537,8 @@ class Worker:
             # * handle children
             for child in self._process_context.children:
                 Logging.print_to_log(
-                    f"Aborting child of '{lock.token}'.",
+                    f"Aborting child '{child.id}' ({child.name}) of job "
+                    + f"'{lock.token}'.",
                     Logging.LEVEL_DEBUG,
                 )
                 try:

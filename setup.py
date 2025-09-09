@@ -2,7 +2,7 @@ from setuptools import setup
 
 
 setup(
-    version="4.1.1",
+    version="4.1.2",
     name="dcm-common",
     description=(
         "common functions and components for the Digital Curation Manager"

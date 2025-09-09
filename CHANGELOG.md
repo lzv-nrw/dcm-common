@@ -1,5 +1,11 @@
 # Changelog
 
+## [4.1.2] - 2025-09-09
+
+### Fixed
+
+- fixed minor issues with orchestra-log messages
+
 ## [4.1.1] - 2025-09-09
 
 ### Fixed
