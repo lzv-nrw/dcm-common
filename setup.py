@@ -2,7 +2,7 @@ from setuptools import setup
 
 
 setup(
-    version="4.1.0",
+    version="4.1.1",
     name="dcm-common",
     description=(
         "common functions and components for the Digital Curation Manager"
@@ -17,6 +17,8 @@ setup(
             "requests>=2",
             "pytest>=7",
             "data-plumber-http>=1.0.0,<2",
+            # orchestra-deps
+            "dill>=0.4.0,<1",
         ],
         "db": [
             "flask>=3",

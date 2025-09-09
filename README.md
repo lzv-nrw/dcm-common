@@ -22,6 +22,7 @@ pip install --extra-index-url https://zivgitlab.uni-muenster.de/api/v4/projects/
 #### Services
 This package defines optional dependencies related to flask-webservices.
 These can be installed by entering `pip install ".[services]"`.
+This extra depends on the [orchestra-subpackage](#orchestra) (the corresponding dependencies will be installed alongside the services-extra dependencies).
 
 #### Database
 The `db`-subpackage imposes additional requirements.

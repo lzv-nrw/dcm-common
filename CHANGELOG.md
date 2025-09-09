@@ -1,5 +1,11 @@
 # Changelog
 
+## [4.1.1] - 2025-09-09
+
+### Fixed
+
+- fixed handling of dependencies for services- and orchestra-extras
+
 ## [4.1.0] - 2025-09-08
 
 ### Added
