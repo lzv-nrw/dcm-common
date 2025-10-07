@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.1.3] - 2025-10-07
+
+### Changed
+
+- doubled default timeout duration for `pytest`-fixture `run_service` after changing to `"spawn"`-method for multiprocessing
+
+### Added
+
+- added support for sqlite-backend in utility-function of `db.key_value_store`-subpackage
+
+### Fixed
+
+- extended documentation for `db.key_value_store`-components
+
 ## [4.1.2] - 2025-09-09
 
 ### Fixed

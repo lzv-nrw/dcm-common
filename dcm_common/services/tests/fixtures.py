@@ -116,7 +116,7 @@ def run_service(request, external_service) -> Callable:
         port: str = 8080,
         routes: Optional[list[tuple[str, Callable, list[str]]]] = None,
         app_config=None,
-        timeout: float = 5,
+        timeout: float = 10,
         probing_path: Optional[str] = None,
     ) -> DilledProcess:
         generate_probing_path = probing_path is None

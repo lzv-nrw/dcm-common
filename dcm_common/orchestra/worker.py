@@ -521,7 +521,7 @@ class Worker:
             if self._abort_context.origin is None:
                 Logging.print_to_log(
                     f"Job '{lock.token}' did not complete: "
-                    + f"{self._abort_context.reason}. Worker"
+                    + f"{self._abort_context.reason}. Worker "
                     + f"'{self._name}' will now abort this job.",
                     Logging.LEVEL_ERROR,
                 )

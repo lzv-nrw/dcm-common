@@ -114,7 +114,10 @@ The implementation is organized in multiple subpackages:
   * `memory`: in-memory implementation without persistent data
   * `disk`: implementation that persists its data onto disk (in a working
     directory)
+    * requires a directory as argument `dir_` (pathlib-Path)
   * `sqlite`: SQLite3-based implementation with support for threading
+    * can be used as persistent or transient database depending on arguments `path` and `memory_id`
+    * accepts argument `timeout` (for connecting to database)
 * `middleware`: provides creation of flask-apps (factory pattern) that implements the 'LZV.nrw - KeyValueStore-API' using a `backend`-component
 
   Running this app provides a shared database for multiple clients (ensures correct handling of concurrency).
@@ -122,13 +125,39 @@ The implementation is organized in multiple subpackages:
   ```python
   from dcm_common.db import MemoryStore, key_value_store_app_factory
 
-  app = key_value_store_app_factory(
-    MemoryStore(), "db"
-  )
+  app = key_value_store_app_factory(MemoryStore(), "db")
   ```
 * `adapter`: provides client-side access to key-value store databases regardless of native- or network-databases with a common interface
   * `native`: native python database (be aware that concurrent requests can lead to unexpected results)
+    * requires a key-value-store-backend as argument
   * `http`: network-database (like the flask-middleware provided here) that implements the 'LZV.nrw - KeyValueStore-API'
+    * requires the `url`-argument (middleware-server)
+    * accepts arguments `timeout` and `proxies` (see `requests`-library for details)
+
+The utility-module of this package also provides helper-functions for initializing adapters (and potentially backends).
+Using the function `load_adapter` from the module `dcm_common.db.key_value_store.util` can, for example, be used to initialize a `native`-adapter including its backend in a single call.
+To this end, write
+```python
+adapter = load_adapter(
+  "my-adapter",  # name
+  "native",  # adapter-type
+  {  # configuration of backend
+    "backend": "sqlite",
+    "path": "<path/to/file.db>",
+    "timeout": 1
+  },
+)
+```
+For an `http`-adapter the settings are passed to the actual adapter instead:
+```python
+adapter = load_adapter(
+  "my-adapter",  # name
+  "http",  # adapter-type
+  {  # configuration of http-adapter
+    "url": "<url-to-key-value-store-api>",
+  },
+)
+```
 
 ### SQL-adapter implementation
 The implementation contains the definition of a common interface and two adapters for PostgreSQL (`PostgreSQLAdapter14`, based on the `psycopg3`-package) and SQLite (`SQLiteAdapter3`, based on the standard library package `sqlite3`) databases.

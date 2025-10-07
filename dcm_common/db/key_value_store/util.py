@@ -8,6 +8,7 @@ from .adapter.http import HTTPKeyValueStoreAdapter
 from .backend.interface import KeyValueStore
 from .backend.memory import MemoryStore
 from .backend.disk import JSONFileStore
+from .backend.sqlite import SQLiteStore
 
 
 ADAPTER_OPTIONS = {
@@ -17,6 +18,7 @@ ADAPTER_OPTIONS = {
 BACKEND_OPTIONS = {
     "memory": MemoryStore,
     "disk": JSONFileStore,
+    "sqlite": SQLiteStore,
 }
 
 
@@ -26,6 +28,11 @@ def load_adapter(
     """
     If valid, returns initilized instance of the requested
     `KeyValueStoreAdapter`.
+
+    If the `adapter` is "native", `settings` are used to initialize a
+    backend (e.g. `{"backend": "sqlite", "path": "<path/to/file.db>"}`).
+    Whereas, if the `adapter` is "http", the settings are passed to the
+    `HTTPKeyValueStoreAdapter` directly.
     """
     if adapter not in ADAPTER_OPTIONS:
         raise ValueError(
@@ -58,4 +65,12 @@ def load_backend(name: str, backend: str, settings: dict) -> KeyValueStore:
         )
     if backend == "memory":
         return MemoryStore()
-    return JSONFileStore(Path(settings["dir"]))
+    if backend == "disk":
+        return JSONFileStore(
+            Path(settings["dir"] if "dir" in settings else settings["dir_"])
+        )
+    return SQLiteStore(
+        settings.get("path"),
+        settings.get("memory_id"),
+        timeout=settings["timeout"] if "timeout" in settings else 5,
+    )
